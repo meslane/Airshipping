@@ -1,56 +1,48 @@
 import pygame
-
+from pathlib import Path
+import typing
+   
 class Entity(pygame.sprite.Sprite):
-    def __init__(self, filepath):
-        pygame.sprite.Sprite.__init__(self)
-        
-        self.original_image = pygame.image.load(filepath).convert() #must preserve an undisturbed copy for rotations
-        self.original_rect = self.original_image.get_rect()
-            
-        self.image = self.original_image
-        self.rect = self.original_rect
-        
-    def set_position(self, coords):
-        self.original_rect.topleft = coords
-        self.rect.topleft = coords
-        
-    def draw(self, surface):
-        surface.blit(self.image, self.rect.topleft)
-        
-    def center_rotate(self, angle):
-        self.image = pygame.transform.rotate(self.original_image, angle)
-        self.rect = self.image.get_rect(center = self.original_image.get_rect(topleft = self.original_rect.topleft).center)
-        
-class Spritesheet(pygame.sprite.Sprite):
-    def __init__(self, filepath, spritesize, matrixsize):
+    def __init__(self, filepath: Path, **kwargs):
         pygame.sprite.Sprite.__init__(self)
     
         self.image = pygame.image.load(filepath).convert_alpha()
         
-        self.original_surface = pygame.Surface(spritesize).convert_alpha() #must preserve an undisturbed copy for rotations
-        self.original_rect = self.original_surface.get_rect()
+        #set to spritesheet size of 1 by default
+        self.spritesize = kwargs.get('spritesize', None)
+        if not self.spritesize:
+            self.spritesize = self.image.get_size()
+            
+        self.matrixsize = kwargs.get('matrixsize', None)
+        if not self.matrixsize:
+            self.matrixsize = (1,1)
+
+        self.angle = 0
         
-        self.surface = self.original_surface
-        self.rect = self.original_rect
+        self.surface = pygame.Surface(self.spritesize).convert_alpha() #must preserve an undisturbed copy for rotations
+        self.rect = self.surface.get_rect()
         
-        self.spritesize = spritesize
-        self.matrixsize = matrixsize
+        self.set_sprite_index(0) #init to zero
         
-    def set_position(self, coords):
-        self.original_rect.topleft = coords
+    def set_position(self, coords: tuple[int,int]):
         self.rect.topleft = coords
+    
+    def translate(self, offset):
+        self.set_position((self.rect.topleft[0] + offset[0], self.rect.topleft[1] + offset[1]))
         
-    def draw(self, surface):
-        surface.blit(self.surface, self.rect.topleft)
+    def draw(self, drawsurface: pygame.surface):
+        if (self.angle == 0):
+            drawsurface.blit(self.surface, self.rect.topleft)
+        else: #rotate and blit if angle != 0 (this is actually better than storing a rotated version persistantly)
+            rotated_surface = pygame.transform.rotate(self.surface, self.angle)
+            new_rect = rotated_surface.get_rect(center = self.surface.get_rect(topleft = self.rect.topleft).center)
+            drawsurface.blit(rotated_surface, new_rect.topleft)
         
-    def center_rotate(self, angle):
-        self.surface = pygame.transform.rotate(self.original_surface, angle)
-        self.rect = self.surface.get_rect(center = self.original_surface.get_rect(topleft = self.original_rect.topleft).center)
+    def center_rotate(self, angle: float):
+        self.angle = angle
         
-    def set_sprite(self, index):
-        self.surface.fill((0,0,0,0))
-        self.original_surface.fill((0,0,0,0))
+    def set_sprite_index(self, index: int):
+        self.surface.fill((0,0,0,0)) #set transparent
         x = (index % self.matrixsize[0]) * self.spritesize[0] #get horizontal location of sprite
         y = (index // self.matrixsize[0]) * self.spritesize[1] #get vertical
-        self.original_surface.blit(self.image, (0,0), (x, y, self.spritesize[0], self.spritesize[1]))
         self.surface.blit(self.image, (0,0), (x, y, self.spritesize[0], self.spritesize[1]))

@@ -9,7 +9,7 @@ def main(argv):
     pygame.init()
     
     pygame.display.set_caption("Airshipping")
-    window = pygame.display.set_mode([640,360], pygame.RESIZABLE)
+    window = pygame.display.set_mode([640,360], pygame.SCALED | pygame.RESIZABLE)
     screen = pygame.Surface((640,360))
     
     gauges = pygame.image.load(os.path.join('Art', 'gauges.png')).convert()
@@ -18,19 +18,15 @@ def main(argv):
     alt = entity.Entity(os.path.join('Art', 'pointer.png'))
     alt.set_position((599, 293))
     
-    #amogus = entity.Entity(os.path.join('Art/shitposts', 'Yes.png'))
-    #amogus.set_position((200,200))
-    #fuel = entity.Entity(os.path.join('Art', 'pointer.png'))
-    #temp = entity.Entity(os.path.join('Art', 'pointer.png'))
-    
-    spritetest = entity.Spritesheet(os.path.join('Art/shitposts', 'sussy.png'), (125,105), (5,1))
+    spritetest = entity.Entity(os.path.join('Art/shitposts', 'sussy.png'), spritesize=(125,105), matrixsize=(5,1))
     spritetest.set_position((300,100))
-    spritetest.set_sprite(0)
     
     run = True
     fps = 0
     frame = 0
+    clock = pygame.time.Clock()
     while run:
+        clock.tick(60)
         startloop = time.time()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -46,22 +42,21 @@ def main(argv):
         alt.center_rotate(frame % 360)
         alt.draw(screen)
         
-        spritetest.set_sprite(frame // 10 % 5)
+        spritetest.set_sprite_index(frame % 5)
         spritetest.center_rotate(frame % 360)
-        spritetest.draw(screen)
         
-        #amogus.center_rotate(frame % 360)
-        #amogus.draw(screen)
-        #alt.center_rotate(screen, (599, 293), frame % 300 - 150)
-        #fuel.center_rotate(screen, (525, 293), frame % 300 - 150)
-        #temp.center_rotate(screen, (451, 293), frame % 300 - 150)
+        if (spritetest.rect.topleft[1] > 0):
+            spritetest.translate((-10,-10))
+        else:
+            spritetest.set_position((300,300))
+        spritetest.draw(screen)
         
         #this goes last in the loop
         window.blit(pygame.transform.scale(screen, window.get_rect().size), (0, 0))
         pygame.display.flip()
         
         fps = int(1/(time.time() - startloop + 0.000001))
-        
+        print(fps)
         frame += 1
     
 if __name__ == "__main__":
