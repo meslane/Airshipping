@@ -53,7 +53,8 @@ class vec2:
     #additional
     def mag(self):
         return math.sqrt(self.x ** 2 + self.y ** 2)
-  
+
+#2d dot product
 def dot(a, b):
     return (a.x * b.x) + (a.y * b.y)
 
