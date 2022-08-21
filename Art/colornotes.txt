@@ -2,3 +2,15 @@ Most important colors:
 -browns
 -greens
 -blues
+
+use HSV instead of RGB for creating pallettes and adjust hue slider to create ramps
+
+Color requirements:
+-black -> grey (4)
+-4 browns
+-3 greens
+-3 blues
+-2 reds
+-4 fleshy tones
+-1 yellow
+-1 purple
