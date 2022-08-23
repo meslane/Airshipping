@@ -6,14 +6,11 @@ from pathlib import Path
 import typing
 import numpy as np
 import math
+import json
 
-def rotate_vec(vector, angle):
-    x = math.cos(angle) * vector[0] - math.sin(angle) * vector[1]
-    y = math.sin(angle) * vector[0] + math.cos(angle) * vector[1]
-    return pymunk.Vec2d(x,y)
 
 class Entity(pygame.sprite.Sprite):
-    def __init__(self, space, filepath: Path, **kwargs):
+    def __init__(self, space: pymunk.Space, filepath: Path, **kwargs):
         pygame.sprite.Sprite.__init__(self)
     
         self.image = pygame.image.load(filepath).convert_alpha()
@@ -33,9 +30,28 @@ class Entity(pygame.sprite.Sprite):
         self.body = pymunk.Body(kwargs.get('mass', 0), 
                                 kwargs.get('moment', 0), 
                                 body_type = kwargs.get('body_type'))
+        self.box = None
         
-        self.box = pymunk.Poly.create_box(self.body, (self.rect.width, self.rect.height))
-        print(self.box.get_vertices())
+        if (kwargs.get('hitbox', None)): #load custom hitbox from json ((0,0) is topleft, not center)
+            with open(kwargs.get('hitbox', None)) as f:
+                data = json.load(f)
+                size = data['size']
+                
+                vertices = []
+                for vertex in data['vertices']: #offset to center
+                    vertices.append([vertex[0] - size[0]//2, vertex[1] - size[1]//2])
+                
+                self.box = pymunk.Poly(self.body, vertices)
+                print(self.box.get_vertices())
+        elif (kwargs.get('shape', None) == 'circle'):
+            radius = self.rect.height
+            if self.rect.width >= self.rect.height:
+                raduis = self.rect.width
+                
+            self.box = pymunk.Circle(self.body, radius)
+        else:
+            self.box = pymunk.Poly.create_box(self.body, (self.rect.width, self.rect.height))
+        
         self.box.collision_type = 1 
         space.add(self.body, self.box)
         self.box.density = 1
@@ -43,14 +59,14 @@ class Entity(pygame.sprite.Sprite):
         self.box.friction = 0.4
         
         self.set_sprite_index(0) #init to zero
-        
+    
     def set_position(self, coords: tuple[int,int]):
         self.body.position = coords
     
-    def translate(self, offset):
+    def translate(self, offset: tuple[int,int]):
         self.set_position((self.body.position[0] + offset[0], self.body.position[1] + offset[1]))
         
-    def draw(self, space, drawsurface: pygame.surface):
+    def draw(self, space: pymunk.Space, drawsurface: pygame.surface):
         #pygame draws from topleft while pymunk draws from center    
         space.reindex_shape(self.box)
         space.reindex_shapes_for_body(self.body) 
