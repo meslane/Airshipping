@@ -44,19 +44,20 @@ class Entity(pygame.sprite.Sprite):
                 self.box = pymunk.Poly(self.body, vertices)
                 print(self.box.get_vertices())
         elif (kwargs.get('shape', None) == 'circle'):
-            radius = self.rect.height
+            radius = self.rect.height // 2
             if self.rect.width >= self.rect.height:
-                raduis = self.rect.width
+                raduis = self.rect.width // 2
                 
             self.box = pymunk.Circle(self.body, radius)
         else:
             self.box = pymunk.Poly.create_box(self.body, (self.rect.width, self.rect.height))
         
-        self.box.collision_type = 1 
+        self.box.collision_type = kwargs.get('collision_type', 1) 
+        self.box.density = kwargs.get('density', 1)
+        self.box.elasticity = kwargs.get('elasticity', 0.1)
+        self.box.friction = kwargs.get('friction', 0.5)
+        
         space.add(self.body, self.box)
-        self.box.density = 1
-        self.box.elasticity = 0.1
-        self.box.friction = 0.4
         
         self.set_sprite_index(0) #init to zero
     

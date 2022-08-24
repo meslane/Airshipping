@@ -83,10 +83,17 @@ def main(argv):
     floor.set_position((320,360-8))
     
     wall = entity.Entity(space, os.path.join('Art', 'wall.png'),
-                        mass = 0,  body_type = pymunk.Body.STATIC)
+                        mass = 0,  body_type = pymunk.Body.DYNAMIC)
     wall.set_position((336,225))
     
     boxes = []
+    
+    ball = entity.Entity(space, os.path.join('Art', 'cannonball.png'),
+                          shape='circle', body_type = pymunk.Body.DYNAMIC,
+                          density = 50)
+    ball.set_position((-500, 0))
+    ball.body.velocity = (800,0)
+    ball.body.angular_velocity = 12
     
     for i in range(20):
         boxes.append(entity.Entity(space, os.path.join('Art', 'box.png'),
@@ -118,7 +125,7 @@ def main(argv):
         
         floor.draw(space, screen)
         wall.draw(space, screen)
-
+        ball.draw(space, screen)
         
         #this goes last in the loop
         #options = pymunk.pygame_util.DrawOptions(screen)
