@@ -6,8 +6,6 @@ import entity
 class World:
     def __init__(self, size, **kwargs):
         self.map = pygame.Surface(size)
-        self.space = pymunk.Space()
-        self.space.gravity = kwargs.get('gravity', (0,400))
         self.camera = kwargs.get('camera', (size[0] //2, size[1] // 2))
         self.entities = entity.EntityGroup()
         self.focus = None
