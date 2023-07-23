@@ -77,14 +77,11 @@ def main(argv):
                         mass = 0,  body_type = pymunk.Body.DYNAMIC))
     map.entities.sprites()[-1].set_position((616,770))
     
-    map.add(entity.Entity(space, os.path.join('Art', 'cannon.png'),
-                            mass = 1, body_type = pymunk.Body.DYNAMIC))
-    map.entities.sprites()[-1].set_position((519,840))
-    
-    joint = pymunk.constraints.PivotJoint(map.entities.sprites()[1].body, 
-                                        map.entities.sprites()[3].body,(22,20), (-2,0))
-    space.add(joint)
-    map.entities.sprites()[1].cannon = map.entities.sprites()[3]
+    cannon = entity.Weapon(space, os.path.join('Art', 'cannon.png'), os.path.join('Art', 'small_cannonball.png'), map, 
+                           origin = (2,0), projectile_mass = 10000, recoil = 5e6)
+    map.add(cannon)
+    map.entities.sprites()[1].attatch_weapon(cannon)
+
     
     
     for i in range(20):
@@ -110,10 +107,6 @@ def main(argv):
         
         keys = pygame.key.get_pressed()
         map.entities.sprites()[1].move(keys)
-        
-        if keys[pygame.K_k]: #shoot (TEMP ONLY)
-            map.entities.sprites()[1].shoot(map, space)
-    
         
         map.draw(screen)
         

@@ -131,7 +131,7 @@ class Entity(GameObject):
         self.box = None        
         self.body = pymunk.Body(kwargs.get('mass', 0), 
                                 kwargs.get('moment', 0), 
-                                body_type = kwargs.get('body_type'))
+                                body_type = kwargs.get('body_type', pymunk.Body.DYNAMIC))
         
         if (kwargs.get('hitbox', None)): #load custom hitbox from json ((0,0) is topleft, not center)
             with open(kwargs.get('hitbox', None)) as f:
@@ -154,6 +154,7 @@ class Entity(GameObject):
         self.body.position = kwargs.get('position', (0,0))
         self.body.velocity = kwargs.get('velocity', (0,0))
         
+        self.space = space
         space.add(self.body, self.box)
     
     '''
@@ -195,6 +196,61 @@ class Entity(GameObject):
         #pygame.draw.rect(drawsurface, (255, 0, 0), self.rect, 2)
 
 '''
+Weapon:
+Class defining equippable weapons
+Inherits from: Entity
+
+args:
+    space: pymunk space that the object exists in
+    filepath: path to sprite file
+    projectile_filepath: path to projectile file
+    map: map object to spawn projectiles to
+kwargs:
+    origin: object origin for attatching to a vehicle thru a pymunk joint (tuple)
+    cooldown: time between firings
+    projectile_velocity: velocity of the projectile
+    projectile_mass: mass of the projectile
+    recoil: firing recoil force 
+'''
+class Weapon(Entity):
+    def __init__(self, space: pymunk.Space, filepath: Path, projectile_filepath: Path, map, **kwargs):
+        Entity.__init__(self, space, filepath, **kwargs)
+        
+        self.map = map
+        self.projectile_filepath = projectile_filepath
+        
+        self.last_fired = 0
+        
+        self.origin = kwargs.get('origin', (0,0))
+        self.cooldown = kwargs.get('cooldown', 1)
+        self.projectile_velocity = kwargs.get('projectile_velocity', 500)
+        self.projectile_mass = kwargs.get('projectile_mass', 250)
+        self.recoil = kwargs.get('recoil', 500000)
+        
+    '''
+    Shoot the cannon
+    '''
+    def fire(self):
+        if (time.time() - self.last_fired >= self.cooldown):
+            self.last_fired = time.time()
+            
+            L = -self.origin[0] + self.rect.width #get offset from mounting point
+            
+            self.map.add(Entity(self.space, self.projectile_filepath,
+                            mass = self.projectile_mass, 
+                            body_type = pymunk.Body.DYNAMIC, 
+                            shape = 'circle',
+                            position = (self.body.position[0] + (L * math.cos(self.body.angle)), 
+                                        self.body.position[1] + (L * math.sin(self.body.angle))),
+                            velocity = (self.projectile_velocity * math.cos(self.body.angle), 
+                                        self.projectile_velocity * math.sin(self.body.angle))))
+            
+            self.body.apply_force_at_local_point(force = (-self.recoil * math.cos(self.body.angle), 
+                                                          -self.recoil * math.sin(self.body.angle)), 
+                                                 point = ((L * math.cos(self.body.angle)), 
+                                                          (L * math.sin(self.body.angle)))) #recoil
+        
+'''
 Ship:
 Class defining airship objects
 Inherits From: Entity
@@ -220,9 +276,10 @@ class Ship(Entity):
         self.turning = kwargs.get('turning', 8)
         self.power = 0
         
+        self.hardpoint_position = (22,20) #relative position of the weapon hardpoint
         self.cannon = None
-        self.cooldown = 1
-        self.last_fired = 0
+        self.cannon_motor = None #motor for moving cannon
+        #self.last_fired = 0
     
     '''
     Move ship by keypress
@@ -251,6 +308,17 @@ class Ship(Entity):
         if keys[pygame.K_d]: #throttle forward
             if (self.power < self.max_power):
                 self.power += 1600
+        if keys[pygame.K_k]: #shoot (TEMP ONLY)
+            self.shoot()
+        
+        #weapon motion controls
+        if self.cannon:
+            if keys[pygame.K_l]: #move cannon down
+                self.cannon_motor.rate = -2
+            elif keys[pygame.K_j]: #move cannon up
+                self.cannon_motor.rate = 2
+            else: #don't move
+                self.cannon_motor.rate = 0
         
     '''
     Update the position of the ship
@@ -288,22 +356,31 @@ class Ship(Entity):
             self.body.apply_force_at_local_point(force=(self.power,0), point=(cg[0], cg[1]))
         
         print(self.body.velocity)
+    
+    '''
+    Attatch a cannon to the craft's hardpoint
+    
+    args:
+        weapon: weapon object to attatch
+    '''
+    def attatch_weapon(self, weapon: Weapon):
+        weapon.set_position((self.body.position[0] + self.hardpoint_position[0] - weapon.origin[0], 
+                             self.body.position[1] + self.hardpoint_position[1] - weapon.origin[1]))
         
-    '''
-    shoot the cannon
-    '''
-    #TODO: clean this up and make the cannonball origin + angle match that of the cannon
-    def shoot(self, map, space):
-        if self.cannon and (time.time() - self.last_fired >= self.cooldown):
-            self.last_fired = time.time()
-           
-            map.add(Entity(space, os.path.join('Art', 'small_cannonball.png'),
-                            mass = 1, 
-                            body_type = pymunk.Body.DYNAMIC, 
-                            shape = 'circle',
-                            position = (self.body.position[0] + 30, self.body.position[1] + 30),
-                            velocity = (10, 10)))
+        self.cannon = weapon
+        joint = pymunk.constraints.PivotJoint(self.body, self.cannon.body,
+                                              self.hardpoint_position, (-self.cannon.origin[0], -self.cannon.origin[1]))
+        self.space.add(joint)
+        
+        self.cannon_motor = pymunk.constraints.SimpleMotor(self.body, self.cannon.body, 0)
+        self.space.add(self.cannon_motor)
 
+    '''
+    Shoot the cannon
+    '''
+    def shoot(self):
+        if self.cannon:
+            self.cannon.fire()
 
 '''
 EntityGroup:
