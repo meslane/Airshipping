@@ -25,15 +25,19 @@ class World:
             entity_pos = self.entities.sprites()[self.focus].body.position
             entity_radius = self.entities.sprites()[self.focus].radius
             
-            if (entity_pos[0] - entity_radius < 0):
-                self.translate((map_rect.width//2, 0))
-            elif (entity_pos[0] + entity_radius > map_rect.width):
-                self.translate((-1 * map_rect.width//2, 0))
-            elif (entity_pos[1] - entity_radius < 0):
-                self.translate((0, map_rect.height//2))
-            elif (entity_pos[1] + entity_radius > map_rect.height):
-                self.translate((0, -1 * map_rect.height//2))
-
+            if (entity_pos[0] - entity_radius < 0): #out of bounds to the left
+                #self.translate((map_rect.width//2, 0))
+                exit()
+            elif (entity_pos[0] + entity_radius > map_rect.width): #out of bounds to the right
+                #self.translate((-1 * map_rect.width//2, 0))
+                exit()
+            elif (entity_pos[1] - entity_radius < 0): #out of bounds below
+                #self.translate((0, map_rect.height//2))
+                exit()
+            elif (entity_pos[1] + entity_radius > map_rect.height): #out of bounds above
+                #self.translate((0, -1 * map_rect.height//2))
+                exit()
+            
             
             self.camera = self.entities.sprites()[self.focus].body.position
         

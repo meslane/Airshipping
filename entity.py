@@ -9,7 +9,20 @@ import math
 import json
 
 import utils
+import os
+import time
 
+'''
+GameObject:
+Implements animation from files
+Inherits from: pygame's sprite class
+
+args:
+    filepath: path to sprite file
+kwargs:
+    spritesize: tuple or array describing the dimensions of the sprite, defaults to the size of the whole image
+    matrixsize: size of the animation matrix, defaults to 1x1 (no animation)
+'''
 class GameObject(pygame.sprite.Sprite):
     def __init__(self, filepath: Path, **kwargs):
         pygame.sprite.Sprite.__init__(self)
@@ -32,12 +45,21 @@ class GameObject(pygame.sprite.Sprite):
         
         self.set_sprite_index(0) #init to zero
     
+    '''
+    Helper function, sets index of the sprite animation based on self.matrixsize
+    
+    args:
+        index: index of the animation to set to
+    '''
     def set_sprite_index(self, index: int):
         self.surface.fill((0,0,0,0)) #set transparent
         x = (index % self.matrixsize[0]) * self.spritesize[0] #get horizontal location of sprite
         y = (index // self.matrixsize[0]) * self.spritesize[1] #get vertical
         self.surface.blit(self.image, (0,0), (x, y, self.spritesize[0], self.spritesize[1]))
     
+    '''
+    Updates the sprite by incrementing it to the next animation frame
+    '''
     def update(self):
         if self.animation_step > 0:
             self.frame += 1
@@ -47,12 +69,29 @@ class GameObject(pygame.sprite.Sprite):
                 self.set_sprite_index(0)
                 self.frame = 0
 
+'''
+StaticObject:
+Class for handling non-physics objects such as backgrounds and UI elements
+Inherits from: GameObject
+
+args:
+    filepath: path to sprite file
+kwargs:
+    position: position on screen of the object
+    angle: angle of the object
+'''
 class StaticObject(GameObject):
     def __init__(self, filepath: Path, **kwargs):
         GameObject.__init__(self, filepath, **kwargs)
         self.position = kwargs.get('position', (0,0))
         self.angle = kwargs.get('angle', 0)
     
+    '''
+    Draws the object to the screen
+    
+    args:
+        surface: pygame surface to draw to
+    '''
     def draw(self, surface: pygame.surface):
         self.rect.topleft = (self.position[0] - self.rect.width // 2, self.position[1] - self.rect.height // 2)
         
@@ -62,7 +101,25 @@ class StaticObject(GameObject):
             rotated_surface = pygame.transform.rotate(self.surface, math.degrees(-1* self.angle))
             new_rect = rotated_surface.get_rect(center = self.surface.get_rect(topleft = self.rect.topleft).center)
             surface.blit(rotated_surface, new_rect.topleft)
-    
+
+'''
+Entity:
+Class for handling physics objects with pymunk integration
+Inherits from: GameObject
+
+args:
+    space: pymunk space that the object exists in
+    filepath: path to sprite file
+kwargs:
+    hitbox: path to .json file containing object's hitbox
+    shape: string defining the shape of the object (defaults to a box if no file or shape arg is given)
+    collision_type: NO IDEA WHAT THIS IS LOL I WROTE THIS A YEAR AGO
+    density: object density for physics simulation
+    elasticity: object elasticity for physics simulation
+    friction: object friction for physics simulation
+    position: position of the object
+    velocity: velocity of the object
+'''
 class Entity(GameObject):
     def __init__(self, space: pymunk.Space, filepath: Path, **kwargs):
         GameObject.__init__(self, filepath, **kwargs)
@@ -94,15 +151,35 @@ class Entity(GameObject):
         self.box.density = kwargs.get('density', 1)
         self.box.elasticity = kwargs.get('elasticity', 0.1)
         self.box.friction = kwargs.get('friction', 0.5)
+        self.body.position = kwargs.get('position', (0,0))
+        self.body.velocity = kwargs.get('velocity', (0,0))
         
         space.add(self.body, self.box)
     
+    '''
+    Set position of the object (this can maybe be removed)
+    
+    args:
+        coords: tuple defining position to move to
+    '''
     def set_position(self, coords: tuple[int,int]):
         self.body.position = coords
     
+    '''
+    Translate object
+    
+    args:
+        offset: tuple defining the movement offset
+    '''
     def translate(self, offset: tuple[int,int]):
         self.set_position((self.body.position[0] + offset[0], self.body.position[1] + offset[1]))
-        
+    
+    '''
+    Draws the object to the screen
+    
+    args:
+        surface: pygame surface to draw to
+    '''
     def draw(self, drawsurface: pygame.surface):
         #pygame draws from topleft while pymunk draws from center    
         self.rect.topleft = (self.body.position[0] - self.rect.width // 2, self.body.position[1] - self.rect.height // 2)
@@ -116,57 +193,136 @@ class Entity(GameObject):
             #pygame.draw.rect(drawsurface, (0, 255, 0), new_rect, 2)
         
         #pygame.draw.rect(drawsurface, (255, 0, 0), self.rect, 2)
-        
+
+'''
+Ship:
+Class defining airship objects
+Inherits From: Entity
+
+args:
+    space: pymunk space that the object exists in
+    filepath: path to sprite file
+kwargs:
+    buoyancy: buoyancy of the ship
+    center_of_gravity: relative location of the center of gravity
+    center_of_buoyancy: relative location of the center of buoyancy
+    max_power: maximum power of ship's engine
+    turning: damping constant for pitching, higher = less power (BAD NAME, SHOULD CHANGE)
+'''
 class Ship(Entity):
     def __init__(self, space: pymunk.Space, filepath: Path, **kwargs):
         Entity.__init__(self, space, filepath, **kwargs)
+        
         self.buoyancy = kwargs.get('buoyancy', 1360000)
         self.body.center_of_gravity = kwargs.get('center_of_gravity', (0, 0))
         self.center_of_buoyancy = kwargs.get('center_of_buoyancy', (0,0))
+        self.max_power = kwargs.get('max_power', 200000)
+        self.turning = kwargs.get('turning', 8)
+        self.power = 0
         
+        self.cannon = None
+        self.cooldown = 1
+        self.last_fired = 0
+    
+    '''
+    Move ship by keypress
+    
+    args:
+        keys: pygame scancodes
+    '''
     def move(self, keys: pygame.key.ScancodeWrapper):
-        power = 200000
-        turning = 8
-        
         cg = self.body.center_of_gravity
         
         if keys[pygame.K_q]:
-            self.body.apply_force_at_local_point(force=(0, -power/turning), point=(cg[0]+30, 0))
-            self.body.apply_force_at_local_point(force=(0, power/turning), point=(cg[0]-30, 0))
+            self.body.apply_force_at_local_point(force=(0, -self.max_power/self.turning), point=(cg[0]+30, 0))
+            self.body.apply_force_at_local_point(force=(0, self.max_power/self.turning), point=(cg[0]-30, 0))
         if keys[pygame.K_e]:
-            self.body.apply_force_at_local_point(force=(0, power/turning), point=(cg[0]+30, 0))
-            self.body.apply_force_at_local_point(force=(0, -power/turning), point=(cg[0]-30, 0))
+            self.body.apply_force_at_local_point(force=(0, self.max_power/self.turning), point=(cg[0]+30, 0))
+            self.body.apply_force_at_local_point(force=(0, -self.max_power/self.turning), point=(cg[0]-30, 0))
         if keys[pygame.K_w]:
             if self.buoyancy < 1500000:
                 self.buoyancy += 1000
         if keys[pygame.K_s]:
             if self.buoyancy >= 1200000:
                 self.buoyancy -= 1000
-        if keys[pygame.K_a]:
-            self.body.apply_force_at_local_point(force=(-power,0), point=(cg[0], cg[1]))
-        if keys[pygame.K_d]:
-            self.body.apply_force_at_local_point(force=(power,0), point=(cg[0], cg[1]))
+        if keys[pygame.K_a]: #throttle back
+            if (self.power > -self.max_power):
+                self.power -= 1600
+        if keys[pygame.K_d]: #throttle forward
+            if (self.power < self.max_power):
+                self.power += 1600
         
-    def update(self):
+    '''
+    Update the position of the ship
+    '''
+    def update(self): #do entity motion
         Entity.update(self)
         
         if (self.body.angular_velocity != 0): #rotation damping
             self.body.angular_velocity /= 1.01
-
-        print(self.buoyancy)
+        
+        '''
+        #coefficient for modeling buyoancy degredation with altitude
+        b_b = 10000
+        if self.body.position[1] > 1:
+            buoyancy = self.buoyancy * math.exp(-self.body.position[1] / b_b) #positive altitude is negative (should probably fix eventually)
+        else:
+            buoyancy = self.buoyancy
+        '''
+        buoyancy = self.buoyancy
+        
+        print(buoyancy)
+        
         cb = self.center_of_buoyancy
+        cg = self.body.center_of_gravity
+        
         angle = self.body.angle
         drag_coeff = 0.5 * 1.2 * 50
-        drag = (drag_coeff * -self.body.velocity[0] * abs(self.body.velocity[0]), drag_coeff * -self.body.velocity[1] * abs(self.body.velocity[1]))
-        self.body.apply_force_at_local_point(force=(-self.buoyancy * math.cos(-angle + 2*math.pi/4), -self.buoyancy * math.sin(-angle + 2*math.pi/4)), point=(cb[0], cb[1]))
-        self.body.apply_force_at_local_point(force=drag, point = self.body.center_of_gravity) #drag
+        drag = (drag_coeff * -self.body.velocity[0] * abs(self.body.velocity[0]), 
+                drag_coeff * -self.body.velocity[1] * abs(self.body.velocity[1]))
+        
+        self.body.apply_force_at_local_point(force=(-buoyancy * math.cos(-angle + 2*math.pi/4), -buoyancy * math.sin(-angle + 2*math.pi/4)), point=(cb[0], cb[1])) #lift
+        self.body.apply_force_at_local_point(force=drag, point = cg) #drag
+        
+        if (abs(self.power) > self.max_power/10): #do engine
+            self.body.apply_force_at_local_point(force=(self.power,0), point=(cg[0], cg[1]))
         
         print(self.body.velocity)
         
+    '''
+    shoot the cannon
+    '''
+    #TODO: clean this up and make the cannonball origin + angle match that of the cannon
+    def shoot(self, map, space):
+        if self.cannon and (time.time() - self.last_fired >= self.cooldown):
+            self.last_fired = time.time()
+           
+            map.add(Entity(space, os.path.join('Art', 'small_cannonball.png'),
+                            mass = 1, 
+                            body_type = pymunk.Body.DYNAMIC, 
+                            shape = 'circle',
+                            position = (self.body.position[0] + 30, self.body.position[1] + 30),
+                            velocity = (10, 10)))
+
+
+'''
+EntityGroup:
+Class for storing entities in one location
+Inherits from: pygame's sprite class
+
+args:
+    *sprites: all sprites to be stored in the class
+'''
 class EntityGroup(pygame.sprite.Group):
     def __init__(self, *sprites):
         pygame.sprite.Group.__init__(self, *sprites)
-        
+    
+    '''
+    Draws the object to the screen
+    
+    args:
+        surface: pygame surface to draw to
+    '''
     def draw(self, surface):
         for sprite in self.sprites():
             sprite.draw(surface)

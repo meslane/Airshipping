@@ -15,16 +15,22 @@ import utils
 
 
 class Needles:
-    def __init__(self, position):
+    def __init__(self, position, gauge_path, pointer_path, num_pointers, pointer_separation, **kwargs):
         self.position = position
         self.group = entity.EntityGroup()
-        self.group.add(entity.StaticObject(os.path.join('Art', 'gauges.png'), position=position))
-        for i in range(3):
-            self.group.add(entity.StaticObject(os.path.join('Art', 'pointer.png'), position=(position[0] - 74 + (i * 74), position[1])))
+        self.group.add(entity.StaticObject(gauge_path, position=position))
+        self.num_pointers = num_pointers
+        self.gauge_range = kwargs.get('gauge_range', 3.6)
         
+        for i in range(self.num_pointers):
+            self.group.add(entity.StaticObject(pointer_path, position=(position[0] - pointer_separation + (i * pointer_separation), position[1])))
+    
+    '''
+    Selects surface to draw to and gauge value from 0 - 100
+    '''
     def draw(self, surface, positions):
-        for i in range(3):
-            self.group.sprites()[i + 1].angle = math.radians((positions[i] * 2.9) - 145)
+        for i in range(self.num_pointers):
+            self.group.sprites()[i + 1].angle = math.radians((positions[i] * self.gauge_range) - ((self.gauge_range/3.6) * 180))
         self.group.draw(surface)
 
 def collide(arbiter, space, data):
@@ -47,8 +53,13 @@ def main(argv):
     consolas = pygame.font.SysFont("Consolas", 14)
 
     map = world.World((1000, 1000))
-    gauges = Needles((320,35))
     
+    #init UI steam gauges
+    gauges = Needles((320,35), os.path.join('Art', 'gauges.png'), os.path.join('Art', 'pointer.png'), 3, 74, gauge_range = 2.9)
+    engine_gauge = Needles((590,310), os.path.join('Art', 'engine_order_2.png'), os.path.join('Art', 'bigpointer.png'), 1, 0, gauge_range = 2.65)
+    lift_gauge = Needles((505,322), os.path.join('Art', 'lift_gauge.png'), os.path.join('Art', 'pointer.png'), 1, 0, gauge_range = 2.65)
+    
+    #map entities
     map.add(entity.Entity(space, os.path.join('Art', 'floor.png'),
                           body_type = pymunk.Body.KINEMATIC))
     map.entities.sprites()[-1].set_position((500,900))
@@ -66,12 +77,21 @@ def main(argv):
                         mass = 0,  body_type = pymunk.Body.DYNAMIC))
     map.entities.sprites()[-1].set_position((616,770))
     
-    '''
+    map.add(entity.Entity(space, os.path.join('Art', 'cannon.png'),
+                            mass = 1, body_type = pymunk.Body.DYNAMIC))
+    map.entities.sprites()[-1].set_position((519,840))
+    
+    joint = pymunk.constraints.PivotJoint(map.entities.sprites()[1].body, 
+                                        map.entities.sprites()[3].body,(22,20), (-2,0))
+    space.add(joint)
+    map.entities.sprites()[1].cannon = map.entities.sprites()[3]
+    
+    
     for i in range(20):
         map.add(entity.Entity(space, os.path.join('Art', 'box.png'),
                         mass = 1,  body_type = pymunk.Body.DYNAMIC))
         map.entities.sprites()[-1].set_position((600, 890 - (i * 15)))
-    '''
+    
     map.focus = 1
 
     run = True
@@ -91,6 +111,10 @@ def main(argv):
         keys = pygame.key.get_pressed()
         map.entities.sprites()[1].move(keys)
         
+        if keys[pygame.K_k]: #shoot (TEMP ONLY)
+            map.entities.sprites()[1].shoot(map, space)
+    
+        
         map.draw(screen)
         
         frames = consolas.render("{} fps".format(round(fps,1)),True, (255,255,255))
@@ -99,9 +123,14 @@ def main(argv):
         screen.blit(frames, (5, 5))
         screen.blit(position, (5, 30))
         
-        temp = 100 * utils.percent((1200000,1500000),map.entities.sprites()[1].buoyancy)
+        buoy = 100 * utils.percent((1200000,1500000),map.entities.sprites()[1].buoyancy)
         alt = 100 * utils.percent((1000,0),map.entities.sprites()[1].body.position[1])
-        gauges.draw(screen, [temp,50,alt])
+        engine = (map.entities.sprites()[1].power / 4000) + 50
+        print(map.entities.sprites()[1].power)
+        
+        gauges.draw(screen, [50,50,alt])
+        engine_gauge.draw(screen, [engine])
+        lift_gauge.draw(screen, [buoy])
         
         #this goes last in the loop
         window.blit(pygame.transform.scale(screen, window.get_rect().size), (0, 0))
