@@ -52,7 +52,7 @@ def main(argv):
     
     consolas = pygame.font.SysFont("Consolas", 14)
 
-    map = world.World((1000, 1000))
+    map = world.World((10000, 10000))
     
     #init UI steam gauges
     gauges = Needles((320,35), os.path.join('Art', 'gauges.png'), os.path.join('Art', 'pointer.png'), 3, 74, gauge_range = 2.9)
@@ -61,33 +61,40 @@ def main(argv):
     
     #map entities
     map.add(entity.Entity(space, os.path.join('Art', 'floor.png'),
-                          body_type = pymunk.Body.KINEMATIC))
-    map.entities.sprites()[-1].set_position((500,900))
+                          body_type = pymunk.Body.KINEMATIC,
+                          position = (500,900)))
     
-    map.add(entity.Ship(space, os.path.join('Art', 'blimp.png'), 
-                            spritesize=(99,47), matrixsize=(2,2), 
-                            mass = 1000, moment = 10000, body_type = pymunk.Body.DYNAMIC,
-                            hitbox=os.path.join('Art','blimp.box'),
-                            animation_step=6,
+    ship = entity.Ship(space, os.path.join('Art', 'blimp.png'), 
+                            spritesize=(99,47), 
+                            matrixsize=(2,2), 
+                            mass = 1000,  
+                            body_type = pymunk.Body.DYNAMIC,
+                            hitbox = os.path.join('Art','blimp.box'),
+                            animation_step = 6,
                             center_of_gravity = (0,20),
-                            center_of_buoyancy = (0,-20)))
-    map.entities.sprites()[-1].set_position((500,820))
+                            center_of_buoyancy = (0,-20),
+                            position = (500,820))
+    map.add(ship)
     
     map.add(entity.Entity(space, os.path.join('Art', 'wall.png'),
-                        mass = 0,  body_type = pymunk.Body.DYNAMIC))
-    map.entities.sprites()[-1].set_position((616,770))
+                        mass = 1,  body_type = pymunk.Body.DYNAMIC,
+                        position = (616,770)))
     
-    cannon = entity.Weapon(space, os.path.join('Art', 'cannon.png'), os.path.join('Art', 'small_cannonball.png'), map, 
-                           origin = (2,0), projectile_mass = 10000, recoil = 5e6)
+    cannon = entity.Weapon(space, os.path.join('Art', 'cannon.png'), os.path.join('Art', 'small_cannonball.png'), map,
+                           mass = 100,
+                           origin = (2,0), 
+                           projectile_mass = 100000,
+                           projectile_velocity = 1000,
+                           recoil = 5e6)
     map.add(cannon)
-    map.entities.sprites()[1].attatch_weapon(cannon)
+    ship.attatch_weapon(cannon)
 
     
     
     for i in range(20):
         map.add(entity.Entity(space, os.path.join('Art', 'box.png'),
-                        mass = 1,  body_type = pymunk.Body.DYNAMIC))
-        map.entities.sprites()[-1].set_position((600, 890 - (i * 15)))
+                        mass = 0.1,  body_type = pymunk.Body.DYNAMIC,
+                        position = (600, 890 - (i * 15))))
     
     map.focus = 1
 
@@ -106,22 +113,21 @@ def main(argv):
         map.map.fill((170,255,255))
         
         keys = pygame.key.get_pressed()
-        map.entities.sprites()[1].move(keys)
+        ship.move(keys)
         
         map.draw(screen)
         
         frames = consolas.render("{} fps".format(round(fps,1)),True, (255,255,255))
-        position = consolas.render("{:0.2f}, {:0.2f}".format(map.entities.sprites()[1].body.position[0], 
-                                                        map.entities.sprites()[1].body.position[1]), True, (255,255,255))
+        position = consolas.render("{:0.2f}, {:0.2f}".format(ship.body.position[0], ship.body.position[1]), 
+                                                             True, (255,255,255))
         screen.blit(frames, (5, 5))
         screen.blit(position, (5, 30))
         
-        buoy = 100 * utils.percent((1200000,1500000),map.entities.sprites()[1].buoyancy)
-        alt = 100 * utils.percent((1000,0),map.entities.sprites()[1].body.position[1])
-        engine = (map.entities.sprites()[1].power / 4000) + 50
-        print(map.entities.sprites()[1].power)
+        buoy = 100 * utils.percent((1200000,1500000), ship.buoyancy)
+        alt = 100 * utils.percent((1000,0), ship.body.position[1])
+        engine = (ship.power / 4000) + 50
         
-        gauges.draw(screen, [50,50,alt])
+        gauges.draw(screen, [50,ship.fuel,alt])
         engine_gauge.draw(screen, [engine])
         lift_gauge.draw(screen, [buoy])
         

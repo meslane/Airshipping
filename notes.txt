@@ -1,1 +1,3 @@
 Need to change engine to constant applied power controlled by user (DONE)
+
+Body interactions are kind of bad, probably due to poor moment calcs, must fix

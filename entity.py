@@ -30,6 +30,7 @@ class GameObject(pygame.sprite.Sprite):
         self.image = pygame.image.load(filepath).convert_alpha()
         self.animation_step = kwargs.get('animation_step', 0)
         self.frame = 0
+        self.animate = True
         
         #set to spritesheet size of 1 by default
         self.spritesize = kwargs.get('spritesize', None)
@@ -61,13 +62,16 @@ class GameObject(pygame.sprite.Sprite):
     Updates the sprite by incrementing it to the next animation frame
     '''
     def update(self):
-        if self.animation_step > 0:
+        if self.animation_step > 0 and self.animate == True:
             self.frame += 1
             if (self.frame // self.animation_step) < self.matrixsize[0] * self.matrixsize[1]:
                 self.set_sprite_index(self.frame // self.animation_step)
             else:
                 self.set_sprite_index(0)
                 self.frame = 0
+        elif self.animate == False:
+            self.set_sprite_index(0)
+            self.frame = 0
 
 '''
 StaticObject:
@@ -126,13 +130,14 @@ class Entity(GameObject):
         
         self.radius = self.rect.height // 2
         if self.rect.width >= self.rect.height:
-            raduis = self.rect.width // 2
+            self.raduis = self.rect.width // 2
 
         self.box = None        
         self.body = pymunk.Body(kwargs.get('mass', 0), 
                                 kwargs.get('moment', 0), 
                                 body_type = kwargs.get('body_type', pymunk.Body.DYNAMIC))
         
+        #determine hitboxes and moments
         if (kwargs.get('hitbox', None)): #load custom hitbox from json ((0,0) is topleft, not center)
             with open(kwargs.get('hitbox', None)) as f:
                 data = json.load(f)
@@ -142,11 +147,27 @@ class Entity(GameObject):
                     vertices.append([vertex[0] - size[0]//2, vertex[1] - size[1]//2])
                 
                 self.box = pymunk.Poly(self.body, vertices)
+                
+                if self.body.moment == 0: #auto-calc moment if not provided by user
+                    self.body.moment = pymunk.moment_for_poly(mass = self.body.mass,
+                                                              vertices = vertices,
+                                                              offset = kwargs.get('center_of_gravity', (0,0)))
+                
         elif (kwargs.get('shape', None) == 'circle'):                
             self.box = pymunk.Circle(self.body, self.radius)
+            
+            if self.body.moment == 0: #auto-calc moment if not provided by user
+                self.body.moment = pymunk.moment_for_circle(mass = self.body.mass,
+                                                            inner_radius = 0,
+                                                            outer_radius = self.radius)
         else:
             self.box = pymunk.Poly.create_box(self.body, (self.rect.width, self.rect.height))
         
+            if self.body.moment == 0: #auto-calc moment if not provided by user
+                self.body.moment = pymunk.moment_for_box(mass = self.body.mass,
+                                                         size = (self.rect.width, self.rect.height))
+        print(self.body.moment)
+            
         self.box.collision_type = kwargs.get('collision_type', 1) 
         self.box.density = kwargs.get('density', 1)
         self.box.elasticity = kwargs.get('elasticity', 0.1)
@@ -264,6 +285,7 @@ kwargs:
     center_of_buoyancy: relative location of the center of buoyancy
     max_power: maximum power of ship's engine
     turning: damping constant for pitching, higher = less power (BAD NAME, SHOULD CHANGE)
+    fuel: amount of fuel onboard (0-100 nominally)
 '''
 class Ship(Entity):
     def __init__(self, space: pymunk.Space, filepath: Path, **kwargs):
@@ -274,6 +296,7 @@ class Ship(Entity):
         self.center_of_buoyancy = kwargs.get('center_of_buoyancy', (0,0))
         self.max_power = kwargs.get('max_power', 200000)
         self.turning = kwargs.get('turning', 8)
+        self.fuel = kwargs.get('fuel', 100)
         self.power = 0
         
         self.hardpoint_position = (22,20) #relative position of the weapon hardpoint
@@ -290,6 +313,8 @@ class Ship(Entity):
     def move(self, keys: pygame.key.ScancodeWrapper):
         cg = self.body.center_of_gravity
         
+        fuel_drain = 0.01
+        
         if keys[pygame.K_q]:
             self.body.apply_force_at_local_point(force=(0, -self.max_power/self.turning), point=(cg[0]+30, 0))
             self.body.apply_force_at_local_point(force=(0, self.max_power/self.turning), point=(cg[0]-30, 0))
@@ -297,31 +322,36 @@ class Ship(Entity):
             self.body.apply_force_at_local_point(force=(0, self.max_power/self.turning), point=(cg[0]+30, 0))
             self.body.apply_force_at_local_point(force=(0, -self.max_power/self.turning), point=(cg[0]-30, 0))
         if keys[pygame.K_w]:
-            if self.buoyancy < 1500000:
+            if self.buoyancy < 1500000 and self.fuel > 0:
                 self.buoyancy += 1000
+                self.fuel -= fuel_drain #drain fuel when adjusting buoyancy
         if keys[pygame.K_s]:
-            if self.buoyancy >= 1200000:
+            if self.buoyancy >= 1200000 and self.fuel > 0:
                 self.buoyancy -= 1000
+                self.fuel -= fuel_drain
         if keys[pygame.K_a]: #throttle back
             if (self.power > -self.max_power):
                 self.power -= 1600
         if keys[pygame.K_d]: #throttle forward
             if (self.power < self.max_power):
                 self.power += 1600
-        if keys[pygame.K_k]: #shoot (TEMP ONLY)
-            self.shoot()
+        if keys[pygame.K_x]: #cut throttle
+            self.power = 0
         
         #weapon motion controls
         if self.cannon:
+            if keys[pygame.K_k]: #shoot
+                self.shoot()
+        
             if keys[pygame.K_l]: #move cannon down
-                self.cannon_motor.rate = -2
+                self.cannon_motor.rate = -1
             elif keys[pygame.K_j]: #move cannon up
-                self.cannon_motor.rate = 2
+                self.cannon_motor.rate = 1
             else: #don't move
                 self.cannon_motor.rate = 0
         
     '''
-    Update the position of the ship
+    Update the position of the ship 
     '''
     def update(self): #do entity motion
         Entity.update(self)
@@ -329,17 +359,7 @@ class Ship(Entity):
         if (self.body.angular_velocity != 0): #rotation damping
             self.body.angular_velocity /= 1.01
         
-        '''
-        #coefficient for modeling buyoancy degredation with altitude
-        b_b = 10000
-        if self.body.position[1] > 1:
-            buoyancy = self.buoyancy * math.exp(-self.body.position[1] / b_b) #positive altitude is negative (should probably fix eventually)
-        else:
-            buoyancy = self.buoyancy
-        '''
         buoyancy = self.buoyancy
-        
-        print(buoyancy)
         
         cb = self.center_of_buoyancy
         cg = self.body.center_of_gravity
@@ -355,8 +375,14 @@ class Ship(Entity):
         if (abs(self.power) > self.max_power/10): #do engine
             self.body.apply_force_at_local_point(force=(self.power,0), point=(cg[0], cg[1]))
         
-        print(self.body.velocity)
-    
+            if self.fuel > 0:
+                self.fuel -= 1e-7 * abs(self.power)
+        
+        if self.fuel <= 0:
+            self.fuel = 0
+            self.power = 0
+            self.animate = False
+        
     '''
     Attatch a cannon to the craft's hardpoint
     
