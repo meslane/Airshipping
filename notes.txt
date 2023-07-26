@@ -1,3 +1,8 @@
 Need to change engine to constant applied power controlled by user (DONE)
 
 Body interactions are kind of bad, probably due to poor moment calcs, must fix
+
+Pymunk wants a fixed time step.
+
+Can account for framerate differences by doing more timesteps per loop with a lower framerate?
+Could have compounding effect though

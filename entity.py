@@ -12,7 +12,7 @@ import utils
 import os
 import time
 
-REFERENCE_PERIOD = 1.0/60.0
+REFERENCE_PERIOD = 1.0/120.0
 
 '''
 GameObject:
@@ -64,6 +64,9 @@ class GameObject(pygame.sprite.Sprite):
     
     '''
     Updates the sprite by incrementing it to the next animation frame
+    
+    args:
+        period: period between frames
     '''
     def update(self, period):
         self.subframe += period
@@ -80,6 +83,12 @@ class GameObject(pygame.sprite.Sprite):
             elif self.animate == False:
                 self.set_sprite_index(0)
                 self.frame = 0
+    
+    '''
+    Update function to be called during every physics cycle, does nothing by default
+    '''
+    def physics_update(self):
+        return None
 
 '''
 StaticObject:
@@ -331,7 +340,7 @@ class Ship(Entity):
             self.body.apply_force_at_local_point(force=(0, -self.max_power/self.turning), point=(cg[0]-30, 0))
         if keys[pygame.K_w]:
             if self.buoyancy < 1500000 and self.fuel > 0:
-                self.buoyancy += 1000 * (period / REFERENCE_PERIOD)
+                self.buoyancy += 1000 * (period / REFERENCE_PERIOD) #adjust for framerate
                 self.fuel -= fuel_drain * (period / REFERENCE_PERIOD) #drain fuel when adjusting buoyancy
         if keys[pygame.K_s]:
             if self.buoyancy >= 1200000 and self.fuel > 0:
@@ -352,47 +361,29 @@ class Ship(Entity):
                 self.shoot()
         
             if keys[pygame.K_l]: #move cannon down
-                self.cannon_motor.rate = -1 * (period / REFERENCE_PERIOD)
+                self.cannon_motor.rate = -1 #these rates are constant since they're processed in physics
             elif keys[pygame.K_j]: #move cannon up
-                self.cannon_motor.rate = 1 * (period / REFERENCE_PERIOD)
+                self.cannon_motor.rate = 1 
             else: #don't move
                 self.cannon_motor.rate = 0
         
     '''
-    Update the position of the ship 
+    Update the position of the ship
+    
+    args:
+        period: period between frames
     '''
     def update(self, period): #do entity motion
         Entity.update(self, period)
-        
-        if (self.body.angular_velocity != 0): #rotation damping
-            self.body.angular_velocity /= 1.01
-        
-        '''
-        buoyancy = self.buoyancy
-        
-        cb = self.center_of_buoyancy
-        cg = self.body.center_of_gravity
-        
-        angle = self.body.angle
-        drag_coeff = 0.5 * 1.2 * 50
-        drag = (drag_coeff * -self.body.velocity[0] * abs(self.body.velocity[0]), 
-                drag_coeff * -self.body.velocity[1] * abs(self.body.velocity[1]))
-        
-        self.body.apply_force_at_local_point(force=(-buoyancy * math.cos(-angle + 2*math.pi/4), -buoyancy * math.sin(-angle + 2*math.pi/4)), point=(cb[0], cb[1])) #lift
-        self.body.apply_force_at_local_point(force=drag, point = cg) #drag
-        
-        if (abs(self.power) > self.max_power/10): #do engine
-            self.body.apply_force_at_local_point(force=(self.power,0), point=(cg[0], cg[1]))
-        
-            if self.fuel > 0:
-                self.fuel -= 1e-7 * abs(self.power) * (period / REFERENCE_PERIOD)
-        '''
         
         if self.fuel <= 0:
             self.fuel = 0
             self.power = 0
             self.animate = False
-            
+    
+    '''
+    Do ship physics
+    '''
     def physics_update(self): #must update physics each time since constant forces are applied
         if (self.body.angular_velocity != 0): #rotation damping
             self.body.angular_velocity /= 1.01
@@ -414,7 +405,7 @@ class Ship(Entity):
             self.body.apply_force_at_local_point(force=(self.power,0), point=(cg[0], cg[1]))
         
             if self.fuel > 0:
-                self.fuel -= 1e-7 * abs(self.power)
+                self.fuel -= 1e-8 * abs(self.power) #drain fuel
         
     '''
     Attatch a cannon to the craft's hardpoint

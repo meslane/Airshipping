@@ -13,7 +13,7 @@ import entity
 import world
 import utils
 
-PHYSICS_STEP = 1.0/240.0
+PHYSICS_STEP = 1.0/480.0
 
 class Needles:
     def __init__(self, position, gauge_path, pointer_path, num_pointers, pointer_separation, **kwargs):
@@ -88,7 +88,7 @@ def main(argv):
                            projectile_mass = 100000,
                            projectile_velocity = 1000,
                            recoil = 5e6,
-                           cooldown = 0)
+                           cooldown = 0.7)
     map.add(cannon)
     ship.attatch_weapon(cannon)
 
@@ -141,12 +141,13 @@ def main(argv):
         pygame.display.flip()
         
         #do physics
-        clock.tick(120) #physics gets fucky if the fps isn't capped
+        clock.tick(120)
         
+        #"oversample" physics
         #we do this because pymunk is happiest when the physics time step is constant
         #this does result in more time error when FPS is higher, but it's an acceptable trade
         for i in range(int(frame_period/PHYSICS_STEP)):
-            ship.physics_update()
+            map.physics()
             space.step(PHYSICS_STEP) #more steps for lower FPS
         
         #calculate period for next frame

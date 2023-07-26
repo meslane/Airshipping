@@ -80,3 +80,10 @@ class World:
 
         self.entities.draw(self.map)
         screen.blit(self.map, (0,0), (view_x, view_y, screen_rect.width, screen_rect.height))
+    
+    '''
+    Do physics for all entities
+    '''
+    def physics(self):
+        for entity in self.entities:
+            entity.physics_update()
