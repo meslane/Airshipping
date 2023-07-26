@@ -18,6 +18,7 @@ class World:
         self.camera = kwargs.get('camera', (size[0] //2, size[1] // 2))
         self.entities = entity.EntityGroup()
         self.focus = None
+        self.tick = 0
     
     '''
     Add an entity to the world
@@ -44,7 +45,7 @@ class World:
     args:
         screen: surface to draw to
     '''
-    def draw(self, screen):
+    def draw(self, screen, period):
         screen_rect = screen.get_rect()
         map_rect = self.map.get_rect()
         
@@ -75,6 +76,7 @@ class World:
         if view_y < 0:
             view_y = 0
         
-        self.entities.update()
+        self.entities.update(period)
+
         self.entities.draw(self.map)
         screen.blit(self.map, (0,0), (view_x, view_y, screen_rect.width, screen_rect.height))

@@ -12,6 +12,8 @@ import utils
 import os
 import time
 
+REFERENCE_PERIOD = 1.0/60.0
+
 '''
 GameObject:
 Implements animation from files
@@ -22,14 +24,16 @@ args:
 kwargs:
     spritesize: tuple or array describing the dimensions of the sprite, defaults to the size of the whole image
     matrixsize: size of the animation matrix, defaults to 1x1 (no animation)
+    framerate: fps of the animation
 '''
 class GameObject(pygame.sprite.Sprite):
     def __init__(self, filepath: Path, **kwargs):
         pygame.sprite.Sprite.__init__(self)
         
         self.image = pygame.image.load(filepath).convert_alpha()
-        self.animation_step = kwargs.get('animation_step', 0)
         self.frame = 0
+        self.subframe = 0
+        self.framerate = kwargs.get('framerate', 60)
         self.animate = True
         
         #set to spritesheet size of 1 by default
@@ -61,17 +65,21 @@ class GameObject(pygame.sprite.Sprite):
     '''
     Updates the sprite by incrementing it to the next animation frame
     '''
-    def update(self):
-        if self.animation_step > 0 and self.animate == True:
-            self.frame += 1
-            if (self.frame // self.animation_step) < self.matrixsize[0] * self.matrixsize[1]:
-                self.set_sprite_index(self.frame // self.animation_step)
-            else:
+    def update(self, period):
+        self.subframe += period
+        if (self.subframe >= (1.0/self.framerate)): #keep animation consistent across fps
+            self.subframe = 0
+        
+            if self.animate == True:
+                self.frame += 1
+                if (self.frame) < self.matrixsize[0] * self.matrixsize[1]:
+                    self.set_sprite_index(self.frame)
+                else:
+                    self.set_sprite_index(0)
+                    self.frame = 0
+            elif self.animate == False:
                 self.set_sprite_index(0)
                 self.frame = 0
-        elif self.animate == False:
-            self.set_sprite_index(0)
-            self.frame = 0
 
 '''
 StaticObject:
@@ -310,7 +318,7 @@ class Ship(Entity):
     args:
         keys: pygame scancodes
     '''
-    def move(self, keys: pygame.key.ScancodeWrapper):
+    def move(self, keys: pygame.key.ScancodeWrapper, period):
         cg = self.body.center_of_gravity
         
         fuel_drain = 0.01
@@ -323,18 +331,18 @@ class Ship(Entity):
             self.body.apply_force_at_local_point(force=(0, -self.max_power/self.turning), point=(cg[0]-30, 0))
         if keys[pygame.K_w]:
             if self.buoyancy < 1500000 and self.fuel > 0:
-                self.buoyancy += 1000
-                self.fuel -= fuel_drain #drain fuel when adjusting buoyancy
+                self.buoyancy += 1000 * (period / REFERENCE_PERIOD)
+                self.fuel -= fuel_drain * (period / REFERENCE_PERIOD) #drain fuel when adjusting buoyancy
         if keys[pygame.K_s]:
             if self.buoyancy >= 1200000 and self.fuel > 0:
-                self.buoyancy -= 1000
-                self.fuel -= fuel_drain
+                self.buoyancy -= 1000 * (period / REFERENCE_PERIOD)
+                self.fuel -= fuel_drain * (period / REFERENCE_PERIOD)
         if keys[pygame.K_a]: #throttle back
             if (self.power > -self.max_power):
-                self.power -= 1600
+                self.power -= 1600 * (period / REFERENCE_PERIOD)
         if keys[pygame.K_d]: #throttle forward
             if (self.power < self.max_power):
-                self.power += 1600
+                self.power += 1600 * (period / REFERENCE_PERIOD)
         if keys[pygame.K_x]: #cut throttle
             self.power = 0
         
@@ -344,18 +352,48 @@ class Ship(Entity):
                 self.shoot()
         
             if keys[pygame.K_l]: #move cannon down
-                self.cannon_motor.rate = -1
+                self.cannon_motor.rate = -1 * (period / REFERENCE_PERIOD)
             elif keys[pygame.K_j]: #move cannon up
-                self.cannon_motor.rate = 1
+                self.cannon_motor.rate = 1 * (period / REFERENCE_PERIOD)
             else: #don't move
                 self.cannon_motor.rate = 0
         
     '''
     Update the position of the ship 
     '''
-    def update(self): #do entity motion
-        Entity.update(self)
+    def update(self, period): #do entity motion
+        Entity.update(self, period)
         
+        if (self.body.angular_velocity != 0): #rotation damping
+            self.body.angular_velocity /= 1.01
+        
+        '''
+        buoyancy = self.buoyancy
+        
+        cb = self.center_of_buoyancy
+        cg = self.body.center_of_gravity
+        
+        angle = self.body.angle
+        drag_coeff = 0.5 * 1.2 * 50
+        drag = (drag_coeff * -self.body.velocity[0] * abs(self.body.velocity[0]), 
+                drag_coeff * -self.body.velocity[1] * abs(self.body.velocity[1]))
+        
+        self.body.apply_force_at_local_point(force=(-buoyancy * math.cos(-angle + 2*math.pi/4), -buoyancy * math.sin(-angle + 2*math.pi/4)), point=(cb[0], cb[1])) #lift
+        self.body.apply_force_at_local_point(force=drag, point = cg) #drag
+        
+        if (abs(self.power) > self.max_power/10): #do engine
+            self.body.apply_force_at_local_point(force=(self.power,0), point=(cg[0], cg[1]))
+        
+            if self.fuel > 0:
+                self.fuel -= 1e-7 * abs(self.power) * (period / REFERENCE_PERIOD)
+        '''
+        
+        if self.fuel <= 0:
+            self.fuel = 0
+            self.power = 0
+            self.animate = False
+            
+    def physics_update(self): #must update physics each time since constant forces are applied
         if (self.body.angular_velocity != 0): #rotation damping
             self.body.angular_velocity /= 1.01
         
@@ -377,11 +415,6 @@ class Ship(Entity):
         
             if self.fuel > 0:
                 self.fuel -= 1e-7 * abs(self.power)
-        
-        if self.fuel <= 0:
-            self.fuel = 0
-            self.power = 0
-            self.animate = False
         
     '''
     Attatch a cannon to the craft's hardpoint

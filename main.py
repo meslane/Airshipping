@@ -13,6 +13,7 @@ import entity
 import world
 import utils
 
+PHYSICS_STEP = 1.0/240.0
 
 class Needles:
     def __init__(self, position, gauge_path, pointer_path, num_pointers, pointer_separation, **kwargs):
@@ -52,7 +53,7 @@ def main(argv):
     
     consolas = pygame.font.SysFont("Consolas", 14)
 
-    map = world.World((10000, 10000))
+    map = world.World((10000, 1000))
     
     #init UI steam gauges
     gauges = Needles((320,35), os.path.join('Art', 'gauges.png'), os.path.join('Art', 'pointer.png'), 3, 74, gauge_range = 2.9)
@@ -70,7 +71,8 @@ def main(argv):
                             mass = 1000,  
                             body_type = pymunk.Body.DYNAMIC,
                             hitbox = os.path.join('Art','blimp.box'),
-                            animation_step = 6,
+                            animation_step = 1,
+                            framerate = 30,
                             center_of_gravity = (0,20),
                             center_of_buoyancy = (0,-20),
                             position = (500,820))
@@ -85,7 +87,8 @@ def main(argv):
                            origin = (2,0), 
                            projectile_mass = 100000,
                            projectile_velocity = 1000,
-                           recoil = 5e6)
+                           recoil = 5e6,
+                           cooldown = 0)
     map.add(cannon)
     ship.attatch_weapon(cannon)
 
@@ -99,7 +102,8 @@ def main(argv):
     map.focus = 1
 
     run = True
-    fps = 0
+    fps = 120
+    frame_period = 1/120
     frame = 0
     clock = pygame.time.Clock()
     #lift = 1000000
@@ -113,9 +117,10 @@ def main(argv):
         map.map.fill((170,255,255))
         
         keys = pygame.key.get_pressed()
-        ship.move(keys)
+        ship.move(keys, frame_period)
         
-        map.draw(screen)
+        #update entitiy animations
+        map.draw(screen, frame_period)
         
         frames = consolas.render("{} fps".format(round(fps,1)),True, (255,255,255))
         position = consolas.render("{:0.2f}, {:0.2f}".format(ship.body.position[0], ship.body.position[1]), 
@@ -134,10 +139,19 @@ def main(argv):
         #this goes last in the loop
         window.blit(pygame.transform.scale(screen, window.get_rect().size), (0, 0))
         pygame.display.flip()
-        clock.tick(120)
-        space.step(1.0/120.0)
         
-        fps = int(1/(time.time() - startloop + 0.000001))
+        #do physics
+        clock.tick(120) #physics gets fucky if the fps isn't capped
+        
+        #we do this because pymunk is happiest when the physics time step is constant
+        #this does result in more time error when FPS is higher, but it's an acceptable trade
+        for i in range(int(frame_period/PHYSICS_STEP)):
+            ship.physics_update()
+            space.step(PHYSICS_STEP) #more steps for lower FPS
+        
+        #calculate period for next frame
+        fps = int(1.0/(time.time() - startloop + 0.000001))
+        frame_period = 1.0/fps
         frame += 1
     
 if __name__ == "__main__":
