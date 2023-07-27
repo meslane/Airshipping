@@ -64,6 +64,7 @@ class GameObject(pygame.sprite.Sprite):
     
     '''
     Updates the sprite by incrementing it to the next animation frame
+    Call this in the GRAPHICS loop
     
     args:
         period: period between frames
@@ -86,6 +87,7 @@ class GameObject(pygame.sprite.Sprite):
     
     '''
     Update function to be called during every physics cycle, does nothing by default
+    Call this in the PHYSICS loop
     '''
     def physics_update(self):
         return None
@@ -150,9 +152,7 @@ class Entity(GameObject):
             self.raduis = self.rect.width // 2
 
         self.box = None        
-        self.body = pymunk.Body(kwargs.get('mass', 0), 
-                                kwargs.get('moment', 0), 
-                                body_type = kwargs.get('body_type', pymunk.Body.DYNAMIC))
+        self.body = pymunk.Body(0, 0, body_type = kwargs.get('body_type', pymunk.Body.DYNAMIC)) #DO NOT let user set mass or moment
         
         #determine hitboxes and moments
         if (kwargs.get('hitbox', None)): #load custom hitbox from json ((0,0) is topleft, not center)
@@ -183,10 +183,9 @@ class Entity(GameObject):
             if self.body.moment == 0: #auto-calc moment if not provided by user
                 self.body.moment = pymunk.moment_for_box(mass = self.body.mass,
                                                          size = (self.rect.width, self.rect.height))
-        print(self.body.moment)
-            
-        self.box.collision_type = kwargs.get('collision_type', 1) 
+        
         self.box.density = kwargs.get('density', 1)
+        self.box.collision_type = kwargs.get('collision_type', 1) 
         self.box.elasticity = kwargs.get('elasticity', 0.1)
         self.box.friction = kwargs.get('friction', 0.5)
         self.body.position = kwargs.get('position', (0,0))
@@ -194,6 +193,8 @@ class Entity(GameObject):
         
         self.space = space
         space.add(self.body, self.box)
+
+        print("Mass = {}, Moment = {}".format(self.body.mass, self.body.moment))
     
     '''
     Set position of the object (this can maybe be removed)
@@ -247,7 +248,7 @@ kwargs:
     origin: object origin for attatching to a vehicle thru a pymunk joint (tuple)
     cooldown: time between firings
     projectile_velocity: velocity of the projectile
-    projectile_mass: mass of the projectile
+    projectile_density: density of the projectile
     recoil: firing recoil force 
 '''
 class Weapon(Entity):
@@ -262,7 +263,7 @@ class Weapon(Entity):
         self.origin = kwargs.get('origin', (0,0))
         self.cooldown = kwargs.get('cooldown', 1)
         self.projectile_velocity = kwargs.get('projectile_velocity', 500)
-        self.projectile_mass = kwargs.get('projectile_mass', 250)
+        self.projectile_density = kwargs.get('projectile_density', 250)
         self.recoil = kwargs.get('recoil', 500000)
         
     '''
@@ -275,7 +276,7 @@ class Weapon(Entity):
             L = -self.origin[0] + self.rect.width #get offset from mounting point
             
             self.map.add(Entity(self.space, self.projectile_filepath,
-                            mass = self.projectile_mass, 
+                            density = self.projectile_density, 
                             body_type = pymunk.Body.DYNAMIC, 
                             shape = 'circle',
                             position = (self.body.position[0] + (L * math.cos(self.body.angle)), 
@@ -283,11 +284,9 @@ class Weapon(Entity):
                             velocity = (self.projectile_velocity * math.cos(self.body.angle), 
                                         self.projectile_velocity * math.sin(self.body.angle))))
             
-            self.body.apply_force_at_local_point(force = (-self.recoil * math.cos(self.body.angle), 
-                                                          -self.recoil * math.sin(self.body.angle)), 
-                                                 point = ((L * math.cos(self.body.angle)), 
-                                                          (L * math.sin(self.body.angle)))) #recoil
-        
+            self.body.apply_force_at_local_point(force = (-self.recoil, 0), 
+                                                 point = (L, 0)) #NOTE: force applied is local to body, not world. angle compensation is not needed
+            
 '''
 Ship:
 Class defining airship objects

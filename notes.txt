@@ -6,3 +6,6 @@ Pymunk wants a fixed time step.
 
 Can account for framerate differences by doing more timesteps per loop with a lower framerate?
 Could have compounding effect though
+
+Pymunk overwrites custom mass unless it is adjusted after body addition to the space
+Set density instead of mass

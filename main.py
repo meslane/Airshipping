@@ -57,8 +57,8 @@ def main(argv):
     
     #init UI steam gauges
     gauges = Needles((320,35), os.path.join('Art', 'gauges.png'), os.path.join('Art', 'pointer.png'), 3, 74, gauge_range = 2.9)
-    engine_gauge = Needles((590,310), os.path.join('Art', 'engine_order_2.png'), os.path.join('Art', 'bigpointer.png'), 1, 0, gauge_range = 2.65)
-    lift_gauge = Needles((505,322), os.path.join('Art', 'lift_gauge.png'), os.path.join('Art', 'pointer.png'), 1, 0, gauge_range = 2.65)
+    engine_gauge = Needles((50,310), os.path.join('Art', 'engine_order_2.png'), os.path.join('Art', 'bigpointer.png'), 1, 0, gauge_range = 2.65)
+    lift_gauge = Needles((135,322), os.path.join('Art', 'lift_gauge.png'), os.path.join('Art', 'pointer.png'), 1, 0, gauge_range = 2.65)
     
     #map entities
     map.add(entity.Entity(space, os.path.join('Art', 'floor.png'),
@@ -68,7 +68,7 @@ def main(argv):
     ship = entity.Ship(space, os.path.join('Art', 'blimp.png'), 
                             spritesize=(99,47), 
                             matrixsize=(2,2), 
-                            mass = 1000,  
+                            density = 1,  
                             body_type = pymunk.Body.DYNAMIC,
                             hitbox = os.path.join('Art','blimp.box'),
                             animation_step = 1,
@@ -79,15 +79,15 @@ def main(argv):
     map.add(ship)
     
     map.add(entity.Entity(space, os.path.join('Art', 'wall.png'),
-                        mass = 1,  body_type = pymunk.Body.DYNAMIC,
+                        density = 10,  body_type = pymunk.Body.DYNAMIC,
                         position = (616,770)))
     
     cannon = entity.Weapon(space, os.path.join('Art', 'cannon.png'), os.path.join('Art', 'small_cannonball.png'), map,
-                           mass = 100,
+                           density = 1,
                            origin = (2,0), 
-                           projectile_mass = 100000,
+                           projectile_density = 10,
                            projectile_velocity = 1000,
-                           recoil = 5e6,
+                           recoil = 5e7,
                            cooldown = 0.7)
     map.add(cannon)
     ship.attatch_weapon(cannon)
@@ -96,7 +96,7 @@ def main(argv):
     
     for i in range(20):
         map.add(entity.Entity(space, os.path.join('Art', 'box.png'),
-                        mass = 0.1,  body_type = pymunk.Body.DYNAMIC,
+                        density = 1,  body_type = pymunk.Body.DYNAMIC,
                         position = (600, 890 - (i * 15))))
     
     map.focus = 1
