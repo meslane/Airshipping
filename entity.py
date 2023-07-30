@@ -126,6 +126,27 @@ class StaticObject(GameObject):
             surface.blit(rotated_surface, new_rect.topleft)
 
 '''
+Gauge:
+Class for steam gauges
+
+args:
+    filepath: path to file for gauge
+    needlepath: path to file for needle
+'''
+class Gauge(StaticObject):
+    def __init__(self, filepath: Path, needlepath: Path, **kwargs):
+        StaticObject.__init__(self, filepath, **kwargs)
+        self.needle = StaticObject(needlepath, position = self.position)
+        self.gauge_range = kwargs.get('gauge_range', 3.6)
+        
+        self.needle_position = kwargs.get('needle_position', 0)
+        
+    def draw(self, surface):
+        StaticObject.draw(self, surface)
+        self.needle.angle = math.radians((self.needle_position  * self.gauge_range) - ((self.gauge_range/3.6) * 180))
+        self.needle.draw(surface)
+        
+'''
 Entity:
 Class for handling physics objects with pymunk integration
 Inherits from: GameObject
@@ -194,7 +215,7 @@ class Entity(GameObject):
         self.space = space
         space.add(self.body, self.box)
 
-        print("Mass = {}, Moment = {}".format(self.body.mass, self.body.moment))
+        #print("Mass = {}, Moment = {}".format(self.body.mass, self.body.moment))
     
     '''
     Set position of the object (this can maybe be removed)
@@ -326,7 +347,7 @@ class Ship(Entity):
     args:
         keys: pygame scancodes
     '''
-    def move(self, keys: pygame.key.ScancodeWrapper, period):
+    def move(self, keys: pygame.key.ScancodeWrapper, period): #TODO, divorce period from this
         cg = self.body.center_of_gravity
         
         fuel_drain = 0.01
@@ -452,3 +473,28 @@ class EntityGroup(pygame.sprite.Group):
     def draw(self, surface):
         for sprite in self.sprites():
             sprite.draw(surface)
+
+'''
+Load entity from file and return it
+
+args:
+    filepath: path to file for entity
+    space: pymunk space
+'''
+def load_entity(filepath: Path, space, **kwargs):
+    original_directory = os.getcwd()
+    os.chdir(os.path.dirname(filepath)) #change current working directory
+
+    with open(os.path.basename(filepath)) as f:
+        entity_data = json.load(f)
+    
+    if entity_data['type'] == 'Ship':
+        object = Ship(space, entity_data['image'], **entity_data, **kwargs)
+    elif entity_data['type'] == 'Weapon':
+        entity_data['projectile_filepath'] = os.path.join(os.path.dirname(filepath), entity_data['projectile_filepath']) #hacky fix so we have the full directory
+        object = Weapon(space, entity_data['image'], **entity_data, **kwargs)
+    else:
+        object = Entity(space, entity_data['image'], **entity_data, **kwargs)
+    
+    os.chdir(original_directory) #reset directory
+    return object

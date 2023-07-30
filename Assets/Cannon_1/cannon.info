@@ -1,0 +1,11 @@
+{
+"type": "Weapon",
+"image": "cannon.png",
+"projectile_filepath": "small_cannonball.png",
+"density": 1,
+"origin": [2,0], 
+"projectile_density": 10,
+"projectile_velocity": 1000,
+"recoil": 2e7,
+"cooldown": 0.7
+}

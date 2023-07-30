@@ -13,8 +13,10 @@ kwargs:
     camera: location of the camera in the world
 '''
 class World:
-    def __init__(self, size, **kwargs):
+    def __init__(self, size, space, **kwargs):
         self.map = pygame.Surface(size)
+        self.space = space
+        
         self.camera = kwargs.get('camera', (size[0] //2, size[1] // 2))
         self.entities = entity.EntityGroup()
         self.focus = None

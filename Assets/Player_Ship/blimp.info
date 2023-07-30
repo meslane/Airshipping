@@ -1,0 +1,11 @@
+{
+"type": "Ship",
+"image": "blimp.png",
+"hitbox": "blimp.box",
+"spritesize": [99,47], 
+"matrixsize": [2,2], 
+"density": 1,  
+"framerate": 30,
+"center_of_gravity": [0,20],
+"center_of_buoyancy": [0,-20]
+}
