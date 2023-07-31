@@ -48,6 +48,8 @@ class GameObject(pygame.sprite.Sprite):
         self.surface = pygame.Surface(self.spritesize).convert_alpha() #must preserve an undisturbed copy for rotations
         self.rect = self.surface.get_rect()
         
+        self.screen_position = (0,0) #position of the object in the player's view (set externally)
+        
         self.set_sprite_index(0) #init to zero
     
     '''
@@ -145,7 +147,47 @@ class Gauge(StaticObject):
         StaticObject.draw(self, surface)
         self.needle.angle = math.radians((self.needle_position  * self.gauge_range) - ((self.gauge_range/3.6) * 180))
         self.needle.draw(surface)
+
+'''
+Button:
+Class for UI buttons
+
+args:
+    filepath: path to file for button
+
+kwargs:
+    callback: function to be executed when button is pressed
+'''
+class Button(StaticObject):
+    def __init__(self, filepath: Path, **kwargs):
+        StaticObject.__init__(self, filepath, **kwargs)
+        self.callback = None
+        self.pressed = False
         
+    def set_callback(self, callback, *args):
+        self.callback = callback
+        self.callback_args = args
+        
+    '''
+    Determine if mouse is inside button and highlight if so
+    '''
+    def draw(self, surface):
+        if utils.in_rect(pygame.mouse.get_pos(), self.rect): #highlight on hover
+            self.set_sprite_index(1)
+            
+            left, middle, right = pygame.mouse.get_pressed()
+            if left:
+                self.pressed = True
+                if self.callback:
+                    self.callback(self.callback_args)
+            else:
+                self.pressed = False
+        else:
+            self.set_sprite_index(0)
+            self.pressed = False
+            
+        StaticObject.draw(self, surface)
+
 '''
 Entity:
 Class for handling physics objects with pymunk integration
@@ -214,8 +256,6 @@ class Entity(GameObject):
         
         self.space = space
         space.add(self.body, self.box)
-
-        #print("Mass = {}, Moment = {}".format(self.body.mass, self.body.moment))
     
     '''
     Set position of the object (this can maybe be removed)
@@ -251,9 +291,6 @@ class Entity(GameObject):
             rotated_surface = pygame.transform.rotate(self.surface, math.degrees(-1* self.body.angle))
             new_rect = rotated_surface.get_rect(center = self.surface.get_rect(topleft = self.rect.topleft).center)
             drawsurface.blit(rotated_surface, new_rect.topleft)
-            #pygame.draw.rect(drawsurface, (0, 255, 0), new_rect, 2)
-        
-        #pygame.draw.rect(drawsurface, (255, 0, 0), self.rect, 2)
 
 '''
 Weapon:
@@ -498,3 +535,4 @@ def load_entity(filepath: Path, space, **kwargs):
     
     os.chdir(original_directory) #reset directory
     return object
+    

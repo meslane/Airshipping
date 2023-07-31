@@ -9,3 +9,5 @@ Could have compounding effect though
 
 Pymunk overwrites custom mass unless it is adjusted after body addition to the space
 Set density instead of mass
+
+Should find a way to wrap Scene and World into a single class

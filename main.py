@@ -12,7 +12,6 @@ import math
 import entity
 import world
 import utils
-import scene
 
 def main(argv):
     pygame.init()
@@ -25,12 +24,13 @@ def main(argv):
     space = pymunk.Space()
     space.gravity = (0,400)
 
-    map = world.World((10000, 1000), space)
+    '''
+    Overworld
+    '''
+    map = world.World(screen, (10000, 1000), space,
+                      do_physics = True,
+                      background_color = (170,255,255))
     
-    main_scene = scene.Scene(screen, map, space, 
-                             do_physics = True,
-                             background_color = (170,255,255))
-
     #init UI steam gauges
     temp_gauge = entity.Gauge(os.path.join('Art', 'temp_gauge.png'), os.path.join('Art', 'pointer.png'), position=(245,35), gauge_range = 2.9)
     fuel_gauge = entity.Gauge(os.path.join('Art', 'fuel_gauge.png'), os.path.join('Art', 'pointer.png'), position=(320,35), gauge_range = 2.9)
@@ -39,11 +39,11 @@ def main(argv):
     lift_gauge = entity.Gauge(os.path.join('Art', 'lift_gauge.png'), os.path.join('Art', 'pointer.png'), position=(135,322), gauge_range = 2.65)
     engine_gauge = entity.Gauge(os.path.join('Art', 'engine_order_2.png'), os.path.join('Art', 'bigpointer.png'), position=(50,310), gauge_range = 2.65)
     
-    main_scene.add_UI(temp_gauge)
-    main_scene.add_UI(fuel_gauge)
-    main_scene.add_UI(alt_gauge)
-    main_scene.add_UI(lift_gauge)
-    main_scene.add_UI(engine_gauge)
+    map.add_UI(temp_gauge)
+    map.add_UI(fuel_gauge)
+    map.add_UI(alt_gauge)
+    map.add_UI(lift_gauge)
+    map.add_UI(engine_gauge)
     
     #map entities
     map.add(entity.Entity(space, os.path.join('Art', 'floor.png'),
@@ -52,7 +52,7 @@ def main(argv):
     
     ship = entity.load_entity(os.path.join('Assets\Player_Ship', 'blimp.info'), space, position = (500,820))
     map.add(ship)
-    main_scene.key_callback = ship.move
+    map.key_callback = ship.move
     
     cannon = entity.load_entity(os.path.join('Assets\Cannon_1', 'cannon.info'), space, map = map)
     map.add(cannon)
@@ -69,6 +69,20 @@ def main(argv):
     
     map.focus = 1
     
+    '''
+    Main Menu
+    '''
+    main_menu = world.World(screen, (640, 360), None,
+                            background_color = (170,255,255))
+                            
+    start_button = entity.Button(os.path.join('Assets', 'Buttons', 'Start_Game.png'),
+                                spritesize = (300,30),
+                                matrixsize = (1,2),
+                                position = (640//2, 360//2))
+    start_button.set_callback(print, "Hello world!")
+    main_menu.add_UI(start_button)
+    
+    state = "Menu"
     run = True
     while run:
         startloop = time.time()
@@ -76,15 +90,9 @@ def main(argv):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
-        
-        #update gauges
-        fuel_gauge.needle_position = ship.fuel
-        alt_gauge.needle_position = 100 * utils.percent((1000,0), ship.body.position[1])
-        lift_gauge.needle_position = 100 * utils.percent((1200000,1500000), ship.buoyancy)
-        engine_gauge.needle_position = (ship.power / 4000) + 50
-        
+                
         #game info text rendering
-        frames = consolas.render("{} fps".format(round(main_scene.fps,1)),True, (255,255,255))
+        frames = consolas.render("{} fps".format(round(map.fps,1)),True, (255,255,255))
         position = consolas.render("{:0.2f}, {:0.2f}".format(ship.body.position[0], ship.body.position[1]), 
                                                              True, (255,255,255))
         screen.blit(frames, (5, 5))
@@ -94,9 +102,30 @@ def main(argv):
         window.blit(pygame.transform.scale(screen, window.get_rect().size), (0, 0))
         pygame.display.flip()
         
-        #tick (THIS GOES LAST)
-        main_scene.tick(startloop)
+        '''
+        Game state machine transitions
+        '''
+        if (state == "Game"):
+            pass
+        elif (state == "Menu"):
+            if start_button.pressed:
+                state = "Game"
         
-    
+        '''
+        Game state machine actions
+        '''
+        if (state == "Game"):
+            #update gauges
+            fuel_gauge.needle_position = ship.fuel
+            alt_gauge.needle_position = 100 * utils.percent((1000,0), ship.body.position[1])
+            lift_gauge.needle_position = 100 * utils.percent((1200000,1500000), ship.buoyancy)
+            engine_gauge.needle_position = (ship.power / 4000) + 50
+            
+            #tick (THIS GOES LAST)
+            map.tick(startloop)
+        
+        elif (state == "Menu"):
+            main_menu.tick(startloop)
+
 if __name__ == "__main__":
     main(sys.argv)
