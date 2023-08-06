@@ -55,13 +55,20 @@ def main(argv):
     map.key_callback = ship.move
     ship.PID_alt_setpoint = 500
     ship.PID_pos_setpoint = 1000
-    ship.NPC = True
+    ship.NPC = False
+    ship.flip()
     
-    cannon = entity.load_entity(os.path.join('Assets\Cannon_1', 'cannon.info'), space, map = map)
+    cannon = entity.load_entity(os.path.join('Assets\Cannon_1', 'cannon.info'), space)
     map.add(cannon)
     ship.attatch_weapon(cannon)
     
-    '''
+    enemy = entity.load_entity(os.path.join('Assets\Enemy_Ship_1', 'Enemy_1.info'), space, position = (500, 700), NPC = True)
+    enemy.PID_alt_setpoint = 300
+    enemy.PID_pos_setpoint = 1000
+    enemy.navigate = True
+    map.add(enemy)
+    
+    
     map.add(entity.Entity(space, os.path.join('Art', 'wall.png'),
                         density = 10,  body_type = pymunk.Body.DYNAMIC,
                         position = (616,770)))
@@ -70,7 +77,6 @@ def main(argv):
         map.add(entity.Entity(space, os.path.join('Art', 'box.png'),
                         density = 1,  body_type = pymunk.Body.DYNAMIC,
                         position = (600, 890 - (i * 15))))
-    '''
     
     map.focus = 1
     
@@ -90,12 +96,16 @@ def main(argv):
     state = "Menu"
     run = True
     showFPS = True
+    tick = 0
     while run:
         startloop = time.time()
         
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
+            if event.type == pygame.KEYUP:
+                if event.key == pygame.K_f:
+                    ship.flip()
                 
         #game info text rendering
         if showFPS:
@@ -133,6 +143,7 @@ def main(argv):
         
         elif (state == "Menu"):
             main_menu.tick(startloop)
+            
 
 if __name__ == "__main__":
     main(sys.argv)

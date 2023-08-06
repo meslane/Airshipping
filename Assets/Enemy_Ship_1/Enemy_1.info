@@ -1,0 +1,19 @@
+{
+"type": "Ship",
+"image": "Enemy_1.png",
+"hitbox": "Enemy_1.box",
+"spritesize": [51,44], 
+"matrixsize": [2,2], 
+"density": 1,
+"framerate": 30,
+"center_of_gravity": [0,14],
+"center_of_buoyancy": [0,-10],
+"min_buoyancy": 0.4e6,
+"max_buoyancy": 0.8e6,
+"alt_P": 0.5,
+"alt_I": 0,
+"alt_D": 0.1,
+"pos_P": 20,
+"pos_I": 0,
+"pos_D": 0
+}

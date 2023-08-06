@@ -11,6 +11,7 @@ import json
 import utils
 import os
 import time
+import copy
 
 REFERENCE_PERIOD = 1.0/120.0
 
@@ -219,6 +220,8 @@ class Entity(GameObject):
         self.box = None        
         self.body = pymunk.Body(0, 0, body_type = kwargs.get('body_type', pymunk.Body.DYNAMIC)) #DO NOT let user set mass or moment
         
+        self.center_of_gravity = kwargs.get('center_of_gravity', (0,0))
+        
         #determine hitboxes and moments
         if (kwargs.get('hitbox', None)): #load custom hitbox from json ((0,0) is topleft, not center)
             with open(kwargs.get('hitbox', None)) as f:
@@ -233,7 +236,7 @@ class Entity(GameObject):
                 if self.body.moment == 0: #auto-calc moment if not provided by user
                     self.body.moment = pymunk.moment_for_poly(mass = self.body.mass,
                                                               vertices = vertices,
-                                                              offset = kwargs.get('center_of_gravity', (0,0)))
+                                                              offset = self.center_of_gravity)
                 
         elif (kwargs.get('shape', None) == 'circle'):                
             self.box = pymunk.Circle(self.body, self.radius)
@@ -267,6 +270,7 @@ class Entity(GameObject):
     '''
     def set_position(self, coords: tuple[int,int]):
         self.body.position = coords
+        self.body.velocity = (0, 0)
     
     '''
     Translate object
@@ -294,6 +298,9 @@ class Entity(GameObject):
             new_rect = rotated_surface.get_rect(center = self.surface.get_rect(topleft = self.rect.topleft).center)
             drawsurface.blit(rotated_surface, new_rect.topleft)
 
+    def __str__(self):
+        return("pos:{} vel:{} cg:{}".format(self.body.position, self.body.velocity, self.body.center_of_gravity))
+
 '''
 Weapon:
 Class defining equippable weapons
@@ -303,7 +310,6 @@ args:
     space: pymunk space that the object exists in
     filepath: path to sprite file
     projectile_filepath: path to projectile file
-    map: map object to spawn projectiles to
 kwargs:
     origin: object origin for attatching to a vehicle thru a pymunk joint (tuple)
     cooldown: time between firings
@@ -312,10 +318,9 @@ kwargs:
     recoil: firing recoil force 
 '''
 class Weapon(Entity):
-    def __init__(self, space: pymunk.Space, filepath: Path, projectile_filepath: Path, map, **kwargs):
+    def __init__(self, space: pymunk.Space, filepath: Path, projectile_filepath: Path, **kwargs):
         Entity.__init__(self, space, filepath, **kwargs)
         
-        self.map = map
         self.projectile_filepath = projectile_filepath
         
         self.last_fired = 0
@@ -335,7 +340,7 @@ class Weapon(Entity):
             
             L = -self.origin[0] + self.rect.width #get offset from mounting point
             
-            self.map.add(Entity(self.space, self.projectile_filepath,
+            self.world.add(Entity(self.space, self.projectile_filepath,
                             density = self.projectile_density, 
                             body_type = pymunk.Body.DYNAMIC, 
                             shape = 'circle',
@@ -387,6 +392,7 @@ class Ship(Entity):
         
         #weapon
         self.hardpoint_position = (22,20) #relative position of the weapon hardpoint
+        self.joint = None
         self.cannon = None
         self.cannon_motor = None #motor for moving cannon
         
@@ -413,6 +419,12 @@ class Ship(Entity):
         
         #attributes
         self.NPC = kwargs.get('NPC', False)
+        self.navigate = kwargs.get('navigate', False) #do PID or not
+        self.flipped = False #facing to the right (False) or left (True)
+        
+        #flipping
+        self.original_image = self.image
+        self.original_hardpoint = self.hardpoint_position
     
     '''
     Move ship by keypress
@@ -505,8 +517,7 @@ class Ship(Entity):
         elif (self.power < -self.max_power):
             self.power = -self.max_power
         
-        print(error)
-        print("kP={}, kI={}, kD={}".format(k_P,k_I,k_D))
+        #print("kP={}, kI={}, kD={}".format(k_P,k_I,k_D))
         
     '''
     Update the position of the ship
@@ -526,7 +537,7 @@ class Ship(Entity):
     Do ship physics
     '''
     def physics_update(self): #must update physics each time since constant forces are applied
-        if (self.NPC): #do PID if NPC
+        if (self.NPC and self.navigate): #do PID if NPC
             self.PID_altitude(self.world.map.get_height(), self.world.physics_step)
             self.PID_position(self.world.map.get_width(), self.world.physics_step)
     
@@ -563,9 +574,9 @@ class Ship(Entity):
                              self.body.position[1] + self.hardpoint_position[1] - weapon.origin[1]))
         
         self.cannon = weapon
-        joint = pymunk.constraints.PivotJoint(self.body, self.cannon.body,
+        self.joint = pymunk.constraints.PivotJoint(self.body, self.cannon.body,
                                               self.hardpoint_position, (-self.cannon.origin[0], -self.cannon.origin[1]))
-        self.space.add(joint)
+        self.space.add(self.joint)
         
         self.cannon_motor = pymunk.constraints.SimpleMotor(self.body, self.cannon.body, 0)
         self.space.add(self.cannon_motor)
@@ -576,7 +587,45 @@ class Ship(Entity):
     def shoot(self):
         if self.cannon:
             self.cannon.fire()
+    
+    '''  
+    Flip
+    '''
+    def flip(self):
+        if not self.flipped:
+            self.image = pygame.transform.flip(self.original_image, True, False)
+            self.hardpoint_position = (-self.original_hardpoint[0], self.original_hardpoint[1])
+            self.flipped = True
+        else:
+            self.image = self.original_image
+            self.hardpoint_position = self.original_hardpoint
+            self.flipped = False
+            
+        new_vertices = []
+            
+        for vertex in self.box.get_vertices():
+            new_vertices.append((-vertex.x, vertex.y))
+        
+        #flip bounding box
+        self.box = pymunk.Poly(self.body, new_vertices)
+        self.body.moment = pymunk.moment_for_poly(mass = self.body.mass,
+                                                              vertices = new_vertices,
+                                                              offset = self.center_of_gravity)
 
+        if self.cannon: #this kind of sucks but it works
+            cannon_copy = copy.copy(self.cannon)
+            self.world.add(cannon_copy)
+
+            self.world.entities.remove(self.cannon)
+            self.space.remove(self.cannon.body)
+            self.space.remove(self.cannon_motor)
+            self.space.remove(self.joint)
+            
+            cannon_copy.space = self.space
+            self.space.add(cannon_copy.body)
+            self.attatch_weapon(cannon_copy)
+            self.cannon.body.angle = 3.14159 - self.cannon.body.angle #mirror about y axis
+            
 '''
 EntityGroup:
 Class for storing entities in one location
