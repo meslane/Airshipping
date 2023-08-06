@@ -53,11 +53,15 @@ def main(argv):
     ship = entity.load_entity(os.path.join('Assets\Player_Ship', 'blimp.info'), space, position = (500,820))
     map.add(ship)
     map.key_callback = ship.move
+    ship.PID_alt_setpoint = 500
+    ship.PID_pos_setpoint = 1000
+    ship.NPC = True
     
     cannon = entity.load_entity(os.path.join('Assets\Cannon_1', 'cannon.info'), space, map = map)
     map.add(cannon)
     ship.attatch_weapon(cannon)
     
+    '''
     map.add(entity.Entity(space, os.path.join('Art', 'wall.png'),
                         density = 10,  body_type = pymunk.Body.DYNAMIC,
                         position = (616,770)))
@@ -66,6 +70,7 @@ def main(argv):
         map.add(entity.Entity(space, os.path.join('Art', 'box.png'),
                         density = 1,  body_type = pymunk.Body.DYNAMIC,
                         position = (600, 890 - (i * 15))))
+    '''
     
     map.focus = 1
     
@@ -73,7 +78,7 @@ def main(argv):
     Main Menu
     '''
     main_menu = world.World(screen, (640, 360), None,
-                            background_color = (170,255,255))
+                            background_color = (79,103,129))
                             
     start_button = entity.Button(os.path.join('Assets', 'Buttons', 'Start_Game.png'),
                                 spritesize = (300,30),
@@ -84,6 +89,7 @@ def main(argv):
     
     state = "Menu"
     run = True
+    showFPS = True
     while run:
         startloop = time.time()
         
@@ -92,11 +98,12 @@ def main(argv):
                 run = False
                 
         #game info text rendering
-        frames = consolas.render("{} fps".format(round(map.fps,1)),True, (255,255,255))
-        position = consolas.render("{:0.2f}, {:0.2f}".format(ship.body.position[0], ship.body.position[1]), 
-                                                             True, (255,255,255))
-        screen.blit(frames, (5, 5))
-        screen.blit(position, (5, 30))
+        if showFPS:
+            frames = consolas.render("{} fps".format(round(map.fps,1)),True, (255,255,255))
+            position = consolas.render("{:0.2f}, {:0.2f}".format(ship.body.position[0], ship.body.position[1]), 
+                                                                 True, (255,255,255))
+            screen.blit(frames, (5, 5))
+            screen.blit(position, (5, 30))
         
         #draw window
         window.blit(pygame.transform.scale(screen, window.get_rect().size), (0, 0))
@@ -118,7 +125,7 @@ def main(argv):
             #update gauges
             fuel_gauge.needle_position = ship.fuel
             alt_gauge.needle_position = 100 * utils.percent((1000,0), ship.body.position[1])
-            lift_gauge.needle_position = 100 * utils.percent((1200000,1500000), ship.buoyancy)
+            lift_gauge.needle_position = 100 * utils.percent((ship.min_buoyancy,ship.max_buoyancy), ship.buoyancy)
             engine_gauge.needle_position = (ship.power / 4000) + 50
             
             #tick (THIS GOES LAST)

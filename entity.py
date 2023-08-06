@@ -30,6 +30,8 @@ class GameObject(pygame.sprite.Sprite):
     def __init__(self, filepath: Path, **kwargs):
         pygame.sprite.Sprite.__init__(self)
         
+        self.world = None
+        
         self.image = pygame.image.load(filepath).convert_alpha()
         self.frame = 0
         self.subframe = 0
@@ -360,12 +362,22 @@ kwargs:
     max_power: maximum power of ship's engine
     turning: damping constant for pitching, higher = less power (BAD NAME, SHOULD CHANGE)
     fuel: amount of fuel onboard (0-100 nominally)
+    
+    alt_P: Proportional term for altitude PID algorithm
+    alt_I: Integral term for altitude PID algorithm
+    alt_D: Derivative term for altitude PID algorithm
+    
+    NPC: Boolean describing if the ship is an NPC or Player
 '''
 class Ship(Entity):
     def __init__(self, space: pymunk.Space, filepath: Path, **kwargs):
         Entity.__init__(self, space, filepath, **kwargs)
+
+        #ship physics
+        self.min_buoyancy = kwargs.get('min_buoyancy', 1e6)
+        self.max_buoyancy = kwargs.get('max_buoyancy', 2e6)
+        self.buoyancy = self.min_buoyancy + (self.max_buoyancy - self.min_buoyancy) / 2 #middle ground
         
-        self.buoyancy = kwargs.get('buoyancy', 1360000)
         self.body.center_of_gravity = kwargs.get('center_of_gravity', (0, 0))
         self.center_of_buoyancy = kwargs.get('center_of_buoyancy', (0,0))
         self.max_power = kwargs.get('max_power', 200000)
@@ -373,10 +385,34 @@ class Ship(Entity):
         self.fuel = kwargs.get('fuel', 100)
         self.power = 0
         
+        #weapon
         self.hardpoint_position = (22,20) #relative position of the weapon hardpoint
         self.cannon = None
         self.cannon_motor = None #motor for moving cannon
-        #self.last_fired = 0
+        
+        #for PID
+        #altitude
+        self.alt_P = kwargs.get('alt_P', 1)
+        self.alt_I = kwargs.get('alt_I', 0)
+        self.alt_D = kwargs.get('alt_D', 0)
+        
+        self.PID_alt_setpoint = 0
+        
+        self.prev_alt_error = 0
+        self.alt_error_sum = 0
+        
+        #position
+        self.pos_P = kwargs.get('pos_P', 1)
+        self.pos_I = kwargs.get('pos_I', 0)
+        self.pos_D = kwargs.get('pos_D', 0)
+        
+        self.PID_pos_setpoint = 0
+        
+        self.prev_pos_error = 0
+        self.pos_error_sum = 0
+        
+        #attributes
+        self.NPC = kwargs.get('NPC', False)
     
     '''
     Move ship by keypress
@@ -385,44 +421,92 @@ class Ship(Entity):
         keys: pygame scancodes
     '''
     def move(self, keys: pygame.key.ScancodeWrapper, period): #TODO, divorce period from this
-        cg = self.body.center_of_gravity
+        if not self.NPC:
+            cg = self.body.center_of_gravity
+            
+            fuel_drain = 0.01
+            
+            if keys[pygame.K_q]:
+                self.body.apply_force_at_local_point(force=(0, -self.max_power/self.turning), point=(cg[0]+30, 0))
+                self.body.apply_force_at_local_point(force=(0, self.max_power/self.turning), point=(cg[0]-30, 0))
+            if keys[pygame.K_e]:
+                self.body.apply_force_at_local_point(force=(0, self.max_power/self.turning), point=(cg[0]+30, 0))
+                self.body.apply_force_at_local_point(force=(0, -self.max_power/self.turning), point=(cg[0]-30, 0))
+            if keys[pygame.K_w]:
+                if self.buoyancy < self.max_buoyancy and self.fuel > 0:
+                    self.buoyancy += 1000 * (period / REFERENCE_PERIOD) #adjust for framerate
+                    self.fuel -= fuel_drain * (period / REFERENCE_PERIOD) #drain fuel when adjusting buoyancy
+            if keys[pygame.K_s]:
+                if self.buoyancy >= self.min_buoyancy and self.fuel > 0:
+                    self.buoyancy -= 1000 * (period / REFERENCE_PERIOD)
+                    self.fuel -= fuel_drain * (period / REFERENCE_PERIOD)
+            if keys[pygame.K_a]: #throttle back
+                if (self.power > -self.max_power):
+                    self.power -= 1600 * (period / REFERENCE_PERIOD)
+            if keys[pygame.K_d]: #throttle forward
+                if (self.power < self.max_power):
+                    self.power += 1600 * (period / REFERENCE_PERIOD)
+            if keys[pygame.K_x]: #cut throttle
+                self.power = 0
+            
+            #weapon motion controls
+            if self.cannon:
+                if keys[pygame.K_k]: #shoot
+                    self.shoot()
+            
+                if keys[pygame.K_l]: #move cannon down
+                    self.cannon_motor.rate = -1 #these rates are constant since they're processed in physics
+                elif keys[pygame.K_j]: #move cannon up
+                    self.cannon_motor.rate = 1 
+                else: #don't move
+                    self.cannon_motor.rate = 0
+    
+    '''
+    Command the ship to hover at a certian altitude
+    
+    args:
+        max_altitude: maximum altitude in the space (for determining error)
+        t: time step (for derivative case)
+    '''
+    def PID_altitude(self, max_altitude, t):
+        neutral_buoyancy = self.min_buoyancy + (self.max_buoyancy - self.min_buoyancy) / 2
+        error = -(self.PID_alt_setpoint - self.body.position[1])/max_altitude
         
-        fuel_drain = 0.01
+        k_P = self.alt_P * error
+        k_I = self.alt_I * self.alt_error_sum
+        k_D = self.alt_D * ((error - self.prev_alt_error)/t)
         
-        if keys[pygame.K_q]:
-            self.body.apply_force_at_local_point(force=(0, -self.max_power/self.turning), point=(cg[0]+30, 0))
-            self.body.apply_force_at_local_point(force=(0, self.max_power/self.turning), point=(cg[0]-30, 0))
-        if keys[pygame.K_e]:
-            self.body.apply_force_at_local_point(force=(0, self.max_power/self.turning), point=(cg[0]+30, 0))
-            self.body.apply_force_at_local_point(force=(0, -self.max_power/self.turning), point=(cg[0]-30, 0))
-        if keys[pygame.K_w]:
-            if self.buoyancy < 1500000 and self.fuel > 0:
-                self.buoyancy += 1000 * (period / REFERENCE_PERIOD) #adjust for framerate
-                self.fuel -= fuel_drain * (period / REFERENCE_PERIOD) #drain fuel when adjusting buoyancy
-        if keys[pygame.K_s]:
-            if self.buoyancy >= 1200000 and self.fuel > 0:
-                self.buoyancy -= 1000 * (period / REFERENCE_PERIOD)
-                self.fuel -= fuel_drain * (period / REFERENCE_PERIOD)
-        if keys[pygame.K_a]: #throttle back
-            if (self.power > -self.max_power):
-                self.power -= 1600 * (period / REFERENCE_PERIOD)
-        if keys[pygame.K_d]: #throttle forward
-            if (self.power < self.max_power):
-                self.power += 1600 * (period / REFERENCE_PERIOD)
-        if keys[pygame.K_x]: #cut throttle
-            self.power = 0
+        self.buoyancy = neutral_buoyancy + (neutral_buoyancy * (k_P + k_I + k_D))
         
-        #weapon motion controls
-        if self.cannon:
-            if keys[pygame.K_k]: #shoot
-                self.shoot()
+        if (self.buoyancy > self.max_buoyancy):
+            self.buoyancy = self.max_buoyancy
+        elif (self.buoyancy < self.min_buoyancy):
+            self.buoyancy = self.min_buoyancy
         
-            if keys[pygame.K_l]: #move cannon down
-                self.cannon_motor.rate = -1 #these rates are constant since they're processed in physics
-            elif keys[pygame.K_j]: #move cannon up
-                self.cannon_motor.rate = 1 
-            else: #don't move
-                self.cannon_motor.rate = 0
+        self.prev_alt_error = error
+        self.alt_error_sum += error
+        
+        #print("kP={}, kI={}, kD={}".format(k_P,k_I,k_D))
+    
+    '''
+    Command the ship to move to a certian position
+    '''
+    def PID_position(self, max_distance, t):
+        error = (self.PID_pos_setpoint - self.body.position[0])/max_distance
+    
+        k_P = self.pos_P * error
+        k_I = self.pos_I * self.pos_error_sum
+        k_D = self.pos_D * ((error - self.prev_pos_error)/t)
+        
+        self.power = self.max_power * (k_P + k_I + k_D)
+        
+        if (self.power > self.max_power):
+            self.power = self.max_power
+        elif (self.power < -self.max_power):
+            self.power = -self.max_power
+        
+        print(error)
+        print("kP={}, kI={}, kD={}".format(k_P,k_I,k_D))
         
     '''
     Update the position of the ship
@@ -442,6 +526,10 @@ class Ship(Entity):
     Do ship physics
     '''
     def physics_update(self): #must update physics each time since constant forces are applied
+        if (self.NPC): #do PID if NPC
+            self.PID_altitude(self.world.map.get_height(), self.world.physics_step)
+            self.PID_position(self.world.map.get_width(), self.world.physics_step)
+    
         if (self.body.angular_velocity != 0): #rotation damping
             self.body.angular_velocity /= 1.01
         
@@ -458,7 +546,7 @@ class Ship(Entity):
         self.body.apply_force_at_local_point(force=(-buoyancy * math.cos(-angle + 2*math.pi/4), -buoyancy * math.sin(-angle + 2*math.pi/4)), point=(cb[0], cb[1])) #lift
         self.body.apply_force_at_local_point(force=drag, point = cg) #drag
         
-        if (abs(self.power) > self.max_power/10): #do engine
+        if (abs(self.power) > self.max_power/10 or self.NPC): #do engine
             self.body.apply_force_at_local_point(force=(self.power,0), point=(cg[0], cg[1]))
         
             if self.fuel > 0:
@@ -535,4 +623,3 @@ def load_entity(filepath: Path, space, **kwargs):
     
     os.chdir(original_directory) #reset directory
     return object
-    

@@ -45,6 +45,7 @@ class World:
         entity: the entity object to add
     '''
     def add(self, entity):
+        entity.world = self
         self.entities.add(entity)
         
     '''
@@ -54,6 +55,7 @@ class World:
         UI_element: element to add
     '''
     def add_UI(self, UI_element):
+        UI_element.world = self
         self.UI.add(UI_element)
      
     '''
