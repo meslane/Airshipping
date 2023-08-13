@@ -37,6 +37,8 @@ class World:
         
         self.fps = 120
         self.frame_period = 1/120
+        
+        self.next_ID = 0
     
     '''
     Add an entity to the world
@@ -46,6 +48,8 @@ class World:
     '''
     def add(self, entity):
         entity.world = self
+        entity.ID = self.next_ID
+        self.next_ID += 1
         self.entities.add(entity)
         
     '''
@@ -56,8 +60,23 @@ class World:
     '''
     def add_UI(self, UI_element):
         UI_element.world = self
+        UI_element.ID = self.next_ID
+        self.next_ID += 1
         self.UI.add(UI_element)
-     
+    
+    '''
+    Search for entities by ID and return a reference if the entity exists
+    
+    args:
+        ID: entity ID number
+    '''
+    def get_entity(self, ID):
+        for entity in self.entities.sprites():
+            if entity.ID == ID:
+                return entity
+                
+        return None
+    
     '''
     Translate all entities within the world
     
@@ -92,10 +111,10 @@ class World:
         map_rect = self.map.get_rect()
         
         if self.focus:
-            entity_pos = self.entities.sprites()[self.focus].body.position
-            entity_radius = self.entities.sprites()[self.focus].radius
+            entity_pos = self.get_entity(self.focus).body.position
+            entity_radius = self.get_entity(self.focus).radius
             
-            self.camera = self.entities.sprites()[self.focus].body.position
+            self.camera = self.get_entity(self.focus).body.position
         
         #remove out of bounds entities:
         for entity in self.entities:

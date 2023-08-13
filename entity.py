@@ -32,7 +32,9 @@ class GameObject(pygame.sprite.Sprite):
         pygame.sprite.Sprite.__init__(self)
         
         self.world = None
+        self.ID = None #unique int to world that gets assigned when object is added
         
+        self.filename = str(filepath)
         self.image = pygame.image.load(filepath).convert_alpha()
         self.frame = 0
         self.subframe = 0
@@ -420,6 +422,7 @@ class Ship(Entity):
         #attributes
         self.NPC = kwargs.get('NPC', False)
         self.navigate = kwargs.get('navigate', False) #do PID or not
+        self.autopilot = False #allow altitude hold if true
         self.flipped = False #facing to the right (False) or left (True)
         
         #flipping
@@ -445,13 +448,21 @@ class Ship(Entity):
                 self.body.apply_force_at_local_point(force=(0, self.max_power/self.turning), point=(cg[0]+30, 0))
                 self.body.apply_force_at_local_point(force=(0, -self.max_power/self.turning), point=(cg[0]-30, 0))
             if keys[pygame.K_w]:
-                if self.buoyancy < self.max_buoyancy and self.fuel > 0:
-                    self.buoyancy += 1000 * (period / REFERENCE_PERIOD) #adjust for framerate
-                    self.fuel -= fuel_drain * (period / REFERENCE_PERIOD) #drain fuel when adjusting buoyancy
+                if not self.autopilot:
+                    if self.buoyancy < self.max_buoyancy and self.fuel > 0:
+                        self.buoyancy += 1000 * (period / REFERENCE_PERIOD) #adjust for framerate
+                        self.fuel -= fuel_drain * (period / REFERENCE_PERIOD) #drain fuel when adjusting buoyancy
+                else:
+                    if (self.PID_alt_setpoint > 0):
+                        self.PID_alt_setpoint -= 5 * (period / REFERENCE_PERIOD)
             if keys[pygame.K_s]:
-                if self.buoyancy >= self.min_buoyancy and self.fuel > 0:
-                    self.buoyancy -= 1000 * (period / REFERENCE_PERIOD)
-                    self.fuel -= fuel_drain * (period / REFERENCE_PERIOD)
+                if not self.autopilot:
+                    if self.buoyancy >= self.min_buoyancy and self.fuel > 0:
+                        self.buoyancy -= 1000 * (period / REFERENCE_PERIOD)
+                        self.fuel -= fuel_drain * (period / REFERENCE_PERIOD)
+                else:
+                    if (self.PID_alt_setpoint < 1000):
+                        self.PID_alt_setpoint += 5 * (period / REFERENCE_PERIOD)
             if keys[pygame.K_a]: #throttle back
                 if (self.power > -self.max_power):
                     self.power -= 1600 * (period / REFERENCE_PERIOD)
@@ -518,7 +529,61 @@ class Ship(Entity):
             self.power = -self.max_power
         
         #print("kP={}, kI={}, kD={}".format(k_P,k_I,k_D))
+    
+    
+    '''
+    Helper function to get the number of objects between self and target
+    '''
+    def num_intersections(self, target_pos, ignore):
+        m = utils.slope(self.body.position, target_pos)
+        b = self.body.position[1] - m * self.body.position[0] #solve for intercept
         
+        intersections = 0
+            
+        for object in self.world.entities.sprites():
+            if (object.ID not in ignore): #filter out objects to ignore
+                i_point = utils.intersects(m, b, object.rect)
+                if i_point:
+                    if utils.x_between(self.body.position, target_pos, i_point): #if intersection point is between self and target
+                        intersections += 1
+                        print("Intersects {} at {}".format(object.filename, utils.intersects(m, b, object.rect)))
+                        
+        return intersections
+    
+    '''
+    Generate position solution for pathfinding to target
+    
+    args:
+        target_ID: ID of the entity to pathfind to
+    '''
+    def pathfind(self, target_ID):
+        POS_INCREMENT = 10
+    
+        target = self.world.get_entity(target_ID)
+        if target:
+            pathfinding_pos = target.body.position
+        else:
+            self.navigate = False #terminate pathfinding if target died
+            return
+        
+        if (self.NPC and target):
+            intersections = self.num_intersections(pathfinding_pos, [self.ID, target_ID])
+            
+            if intersections > 0: #if there is not a direct path to the target, search above 
+                while intersections != 0 and pathfinding_pos[1] > POS_INCREMENT: #search above until there is a clear path
+                    pathfinding_pos = (pathfinding_pos[0], pathfinding_pos[1] - POS_INCREMENT) 
+                    intersections = self.num_intersections(pathfinding_pos, [self.ID, target_ID])
+                    
+            if intersections > 0: #if searching above failed
+                pathfinding_pos = (pathfinding_pos[0], target.body.position[1])
+                while intersections != 0 and pathfinding_pos[1] < (self.world.map.get_height() - POS_INCREMENT):
+                    pathfinding_pos = (pathfinding_pos[0], pathfinding_pos[1] + POS_INCREMENT) 
+                    intersections = self.num_intersections(pathfinding_pos, [self.ID, target_ID])
+            
+            self.PID_alt_setpoint = pathfinding_pos[1]
+            self.PID_pos_setpoint = pathfinding_pos[0]
+            
+    
     '''
     Update the position of the ship
     
@@ -540,6 +605,8 @@ class Ship(Entity):
         if (self.NPC and self.navigate): #do PID if NPC
             self.PID_altitude(self.world.map.get_height(), self.world.physics_step)
             self.PID_position(self.world.map.get_width(), self.world.physics_step)
+        elif (not self.NPC and self.autopilot):
+            self.PID_altitude(self.world.map.get_height(), self.world.physics_step)
     
         if (self.body.angular_velocity != 0): #rotation damping
             self.body.angular_velocity /= 1.01

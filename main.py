@@ -34,13 +34,15 @@ def main(argv):
     #init UI steam gauges
     temp_gauge = entity.Gauge(os.path.join('Art', 'temp_gauge.png'), os.path.join('Art', 'pointer.png'), position=(245,35), gauge_range = 2.9)
     fuel_gauge = entity.Gauge(os.path.join('Art', 'fuel_gauge.png'), os.path.join('Art', 'pointer.png'), position=(320,35), gauge_range = 2.9)
-    alt_gauge = entity.Gauge(os.path.join('Art', 'alt_gauge.png'), os.path.join('Art', 'pointer.png'), position=(395,35), gauge_range = 2.9)
+    alt_gauge = entity.Gauge(os.path.join('Art', 'empty_gauge.png'), os.path.join('Art', 'pointer.png'), position=(395,35), gauge_range = 2.9)
+    autopilot_gauge = entity.Gauge(os.path.join('Art', 'alt_gauge.png'), os.path.join('Art', 'smallpointer.png'), position=(395,35), gauge_range = 2.9)
     
     lift_gauge = entity.Gauge(os.path.join('Art', 'lift_gauge.png'), os.path.join('Art', 'pointer.png'), position=(135,322), gauge_range = 2.65)
     engine_gauge = entity.Gauge(os.path.join('Art', 'engine_order_2.png'), os.path.join('Art', 'bigpointer.png'), position=(50,310), gauge_range = 2.65)
     
     map.add_UI(temp_gauge)
     map.add_UI(fuel_gauge)
+    map.add_UI(autopilot_gauge)
     map.add_UI(alt_gauge)
     map.add_UI(lift_gauge)
     map.add_UI(engine_gauge)
@@ -56,29 +58,31 @@ def main(argv):
     ship.PID_alt_setpoint = 500
     ship.PID_pos_setpoint = 1000
     ship.NPC = False
-    ship.flip()
     
     cannon = entity.load_entity(os.path.join('Assets\Cannon_1', 'cannon.info'), space)
     map.add(cannon)
     ship.attatch_weapon(cannon)
     
-    enemy = entity.load_entity(os.path.join('Assets\Enemy_Ship_1', 'Enemy_1.info'), space, position = (500, 700), NPC = True)
+    enemy = entity.load_entity(os.path.join('Assets\Enemy_Ship_1', 'Enemy_1.info'), space, position = (700,820), NPC = True)
     enemy.PID_alt_setpoint = 300
     enemy.PID_pos_setpoint = 1000
     enemy.navigate = True
     map.add(enemy)
     
+    map.add(entity.Entity(space, os.path.join('Art', 'floor.png'),
+                      body_type = pymunk.Body.KINEMATIC,
+                      position = (500,600)))
     
     map.add(entity.Entity(space, os.path.join('Art', 'wall.png'),
                         density = 10,  body_type = pymunk.Body.DYNAMIC,
                         position = (616,770)))
-    
+
     for i in range(20):
         map.add(entity.Entity(space, os.path.join('Art', 'box.png'),
                         density = 1,  body_type = pymunk.Body.DYNAMIC,
                         position = (600, 890 - (i * 15))))
-    
-    map.focus = 1
+
+    map.focus = ship.ID
     
     '''
     Main Menu
@@ -106,6 +110,11 @@ def main(argv):
             if event.type == pygame.KEYUP:
                 if event.key == pygame.K_f:
                     ship.flip()
+                if event.key == pygame.K_p:
+                    if ship.autopilot:
+                        ship.autopilot = False
+                    else:
+                        ship.autopilot = True
                 
         #game info text rendering
         if showFPS:
@@ -135,15 +144,19 @@ def main(argv):
             #update gauges
             fuel_gauge.needle_position = ship.fuel
             alt_gauge.needle_position = 100 * utils.percent((1000,0), ship.body.position[1])
+            autopilot_gauge.needle_position = 100 * utils.percent((1000,0), ship.PID_alt_setpoint)
             lift_gauge.needle_position = 100 * utils.percent((ship.min_buoyancy,ship.max_buoyancy), ship.buoyancy)
             engine_gauge.needle_position = (ship.power / 4000) + 50
             
             #tick (THIS GOES LAST)
+            if (tick % 10 == 0):
+                enemy.pathfind(ship.ID)
             map.tick(startloop)
         
         elif (state == "Menu"):
             main_menu.tick(startloop)
-            
+        
+        tick += 1
 
 if __name__ == "__main__":
     main(sys.argv)

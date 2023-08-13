@@ -11,7 +11,7 @@
 "min_buoyancy": 1.2e6,
 "max_buoyancy": 1.55e6,
 "alt_P": 0.5,
-"alt_I": 0,
+"alt_I": 1e-5,
 "alt_D": 0.1,
 "pos_P": 20,
 "pos_I": 0,
