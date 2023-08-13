@@ -1,8 +1,26 @@
 import pygame
 import pymunk
 import time
-
 import entity
+
+'''
+Task:
+    class containing tasks for scheduling
+    
+args:
+    callback: function to call
+    period: period of time between function calls
+'''
+class Task:
+    def __init__(self, callback, period, *args):
+        self.callback = callback
+        self.period = period
+        self.args = args
+        
+        self.last_run = 0
+        
+    def run(self):
+        self.callback(self.args)
 
 '''
 World:
@@ -39,6 +57,9 @@ class World:
         self.frame_period = 1/120
         
         self.next_ID = 0
+        
+        self.tasks = []
+        self.tasks.append(Task(self.pathfind, 1))
     
     '''
     Add an entity to the world
@@ -149,7 +170,15 @@ class World:
     def physics(self):
         for entity in self.entities:
             entity.physics_update()
-            
+    
+    '''
+    Do pathfinding for all entities
+    '''
+    def pathfind(self, *args):
+        for object in self.entities.sprites(): #pathfind entities
+            if isinstance(object, entity.Ship) and object.NPC and object.target_ID:
+                object.pathfind(object.target_ID)
+    
     '''
     Advance one frame and do physics
     
@@ -176,6 +205,12 @@ class World:
             for i in range(int(self.frame_period/self.physics_step)):
                 self.physics()
                 self.space.step(self.physics_step) #more steps for lower FPS
+        
+        #scheduler code to run tasks
+        for task in self.tasks:
+            if startloop - task.last_run >= task.period:
+                task.last_run = startloop
+                task.run()
         
         #calculate period for next frame
         self.fps = int(1.0/(time.time() - startloop + 1e-8))

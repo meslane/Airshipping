@@ -67,11 +67,8 @@ def main(argv):
     enemy.PID_alt_setpoint = 300
     enemy.PID_pos_setpoint = 1000
     enemy.navigate = True
+    enemy.target_ID = ship.ID
     map.add(enemy)
-    
-    map.add(entity.Entity(space, os.path.join('Art', 'floor.png'),
-                      body_type = pymunk.Body.KINEMATIC,
-                      position = (500,600)))
     
     map.add(entity.Entity(space, os.path.join('Art', 'wall.png'),
                         density = 10,  body_type = pymunk.Body.DYNAMIC,
@@ -149,8 +146,6 @@ def main(argv):
             engine_gauge.needle_position = (ship.power / 4000) + 50
             
             #tick (THIS GOES LAST)
-            if (tick % 10 == 0):
-                enemy.pathfind(ship.ID)
             map.tick(startloop)
         
         elif (state == "Menu"):

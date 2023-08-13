@@ -422,6 +422,8 @@ class Ship(Entity):
         #attributes
         self.NPC = kwargs.get('NPC', False)
         self.navigate = kwargs.get('navigate', False) #do PID or not
+        self.target_ID = None #ID of target to pathfind to
+        
         self.autopilot = False #allow altitude hold if true
         self.flipped = False #facing to the right (False) or left (True)
         
@@ -546,7 +548,7 @@ class Ship(Entity):
                 if i_point:
                     if utils.x_between(self.body.position, target_pos, i_point): #if intersection point is between self and target
                         intersections += 1
-                        print("Intersects {} at {}".format(object.filename, utils.intersects(m, b, object.rect)))
+                        #print("Intersects {} at {}".format(object.filename, utils.intersects(m, b, object.rect)))
                         
         return intersections
     
@@ -583,6 +585,10 @@ class Ship(Entity):
             self.PID_alt_setpoint = pathfinding_pos[1]
             self.PID_pos_setpoint = pathfinding_pos[0]
             
+            if (self.body.position[0] > target.body.position[0] and self.flipped == False):
+                self.flip()
+            elif (self.body.position[0] < target.body.position[0] and self.flipped == True):
+                self.flip()
     
     '''
     Update the position of the ship
