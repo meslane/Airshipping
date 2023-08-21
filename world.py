@@ -1,7 +1,10 @@
 import pygame
 import pymunk
 import time
+import math
+
 import entity
+
 
 '''
 Task:
@@ -150,18 +153,20 @@ class World:
             elif (entity_pos[1] > map_rect.height):
                 self.entities.remove(entity)
         
-        view_x = self.camera[0] - (screen_rect.width // 2)
-        view_y = self.camera[1] - (screen_rect.height // 2)
+        view_x = round(self.camera[0]) - (screen_rect.width // 2) #MUST ROUND or it looks jittery
+        view_y = round(self.camera[1]) - (screen_rect.height // 2)
         
         if view_x < 0:
             view_x = 0
         if view_y < 0:
             view_y = 0
         
+        #print("{} {}".format(view_x, view_y))
+        
         self.entities.update(period)
 
         self.entities.draw(self.map)        
-        screen.blit(self.map, (0,0), (view_x, view_y, screen_rect.width, screen_rect.height))
+        screen.blit(self.map, (0,0), (view_x, view_y, screen_rect.width, screen_rect.height)) #draw and center around focus
         self.UI.draw(self.screen)
     
     '''

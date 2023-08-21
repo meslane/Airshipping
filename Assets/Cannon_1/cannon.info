@@ -1,6 +1,6 @@
 {
 "type": "Weapon",
-"image": "cannon.png",
+"image_filename": "cannon.png",
 "projectile_filepath": "small_cannonball.png",
 "density": 1,
 "origin": [2,0], 

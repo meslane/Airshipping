@@ -32,13 +32,13 @@ def main(argv):
                       background_color = (170,255,255))
     
     #init UI steam gauges
-    temp_gauge = entity.Gauge(os.path.join('Art', 'temp_gauge.png'), os.path.join('Art', 'pointer.png'), position=(245,35), gauge_range = 2.9)
-    fuel_gauge = entity.Gauge(os.path.join('Art', 'fuel_gauge.png'), os.path.join('Art', 'pointer.png'), position=(320,35), gauge_range = 2.9)
-    alt_gauge = entity.Gauge(os.path.join('Art', 'empty_gauge.png'), os.path.join('Art', 'pointer.png'), position=(395,35), gauge_range = 2.9)
-    autopilot_gauge = entity.Gauge(os.path.join('Art', 'alt_gauge.png'), os.path.join('Art', 'smallpointer.png'), position=(395,35), gauge_range = 2.9)
+    temp_gauge = entity.Gauge(entity.load_image(os.path.join('Art', 'temp_gauge.png')), entity.load_image(os.path.join('Art', 'pointer.png')), position=(245,35), gauge_range = 2.9)
+    fuel_gauge = entity.Gauge(entity.load_image(os.path.join('Art', 'fuel_gauge.png')), entity.load_image(os.path.join('Art', 'pointer.png')), position=(320,35), gauge_range = 2.9)
+    alt_gauge = entity.Gauge(entity.load_image(os.path.join('Art', 'empty_gauge.png')), entity.load_image(os.path.join('Art', 'pointer.png')), position=(395,35), gauge_range = 2.9)
+    autopilot_gauge = entity.Gauge(entity.load_image(os.path.join('Art', 'alt_gauge.png')), entity.load_image(os.path.join('Art', 'smallpointer.png')), position=(395,35), gauge_range = 2.9)
     
-    lift_gauge = entity.Gauge(os.path.join('Art', 'lift_gauge.png'), os.path.join('Art', 'pointer.png'), position=(135,322), gauge_range = 2.65)
-    engine_gauge = entity.Gauge(os.path.join('Art', 'engine_order_2.png'), os.path.join('Art', 'bigpointer.png'), position=(50,310), gauge_range = 2.65)
+    lift_gauge = entity.Gauge(entity.load_image(os.path.join('Art', 'lift_gauge.png')), entity.load_image(os.path.join('Art', 'pointer.png')), position=(135,322), gauge_range = 2.65)
+    engine_gauge = entity.Gauge(entity.load_image(os.path.join('Art', 'engine_order_2.png')), entity.load_image(os.path.join('Art', 'bigpointer.png')), position=(50,310), gauge_range = 2.65)
     
     map.add_UI(temp_gauge)
     map.add_UI(fuel_gauge)
@@ -48,7 +48,7 @@ def main(argv):
     map.add_UI(engine_gauge)
     
     #map entities
-    map.add(entity.Entity(space, os.path.join('Art', 'floor.png'),
+    map.add(entity.Entity(space, entity.load_image(os.path.join('Art', 'floor.png')),
                           body_type = pymunk.Body.KINEMATIC,
                           position = (500,900)))
     
@@ -70,16 +70,34 @@ def main(argv):
     enemy.target_ID = ship.ID
     map.add(enemy)
     
-    map.add(entity.Entity(space, os.path.join('Art', 'wall.png'),
+    map.add(entity.Entity(space, entity.load_image(os.path.join('Art', 'wall.png')),
                         density = 10,  body_type = pymunk.Body.DYNAMIC,
                         position = (616,770)))
 
     for i in range(20):
-        map.add(entity.Entity(space, os.path.join('Art', 'box.png'),
+        map.add(entity.Entity(space, entity.load_image(os.path.join('Art', 'box.png')),
                         density = 1,  body_type = pymunk.Body.DYNAMIC,
                         position = (600, 890 - (i * 15))))
 
     map.focus = ship.ID
+    
+    tile = entity.Entity(space, entity.load_image(os.path.join('Art', 'grasstile.png')), position = (200,500))
+    tile = entity.merge(tile, tile, 'x', body_type = pymunk.Body.KINEMATIC)
+    map.add(tile)
+    
+    grass = entity.Entity(None, entity.load_image(os.path.join('Assets', 'Tiles', 'top_grass.png')), 
+                            position = (200,500-16),
+                            matrixsize = (3,1),
+                            spritesize = (16,16),
+                            framerate = 2,
+                            frame_sequence = [0, 1, 2, 1])
+    grass = entity.merge(grass, grass, 'x', matrixsize = (3,1),
+                            spritesize = (32,16),
+                            framerate = 2,
+                            frame_sequence = [0, 1, 2, 1])
+    map.add(grass)
+    
+    
     
     '''
     Main Menu
@@ -87,12 +105,18 @@ def main(argv):
     main_menu = world.World(screen, (640, 360), None,
                             background_color = (79,103,129))
                             
-    start_button = entity.Button(os.path.join('Assets', 'Buttons', 'Start_Game.png'),
+    start_button = entity.Button(entity.load_image(os.path.join('Assets', 'Buttons', 'New_Game.png')),
                                 spritesize = (300,30),
                                 matrixsize = (1,2),
-                                position = (640//2, 360//2))
-    start_button.set_callback(print, "Hello world!")
+                                position = (640//2, 360//2 - 30))
+    #start_button.set_callback(print, "Hello world!")
     main_menu.add_UI(start_button)
+    
+    load_button = entity.Button(entity.load_image(os.path.join('Assets', 'Buttons', 'Load_Game.png')),
+                                spritesize = (300,30),
+                                matrixsize = (1,2),
+                                position = (640//2, 360//2 + 30))
+    main_menu.add_UI(load_button)
     
     state = "Menu"
     run = True

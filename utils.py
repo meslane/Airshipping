@@ -101,3 +101,28 @@ def x_between(p1, p2, p3):
         return False
             
     return True
+    
+'''
+Interleve two byte arrays
+
+args:
+    a: first array
+    b: second array
+    num: number of bytes to interleave
+'''
+def interleave(a, b, num):
+    c = bytes()
+    
+    a_index = 0
+    b_index = 0
+
+    for i in range((len(a) + len(b))//(num  * 2)):
+        for j in range(num):
+            c += bytes([a[a_index]])
+            a_index += 1
+            
+        for j in range(num):
+            c += bytes([b[b_index]])
+            b_index += 1
+            
+    return c

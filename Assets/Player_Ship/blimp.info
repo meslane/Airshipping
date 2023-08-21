@@ -1,6 +1,6 @@
 {
 "type": "Ship",
-"image": "blimp.png",
+"image_filename": "blimp.png",
 "hitbox": "blimp.box",
 "spritesize": [99,47], 
 "matrixsize": [2,2], 

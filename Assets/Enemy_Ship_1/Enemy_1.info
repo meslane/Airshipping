@@ -1,6 +1,6 @@
 {
 "type": "Ship",
-"image": "Enemy_1.png",
+"image_filename": "Enemy_1.png",
 "hitbox": "Enemy_1.box",
 "spritesize": [51,44], 
 "matrixsize": [2,2], 

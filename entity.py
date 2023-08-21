@@ -1,4 +1,5 @@
 import pygame
+import pygame.image
 import pymunk
 import pymunk.pygame_util
 
@@ -21,24 +22,24 @@ Implements animation from files
 Inherits from: pygame's sprite class
 
 args:
-    filepath: path to sprite file
+    image: pygame surface object for sprite
 kwargs:
     spritesize: tuple or array describing the dimensions of the sprite, defaults to the size of the whole image
     matrixsize: size of the animation matrix, defaults to 1x1 (no animation)
     framerate: fps of the animation
 '''
 class GameObject(pygame.sprite.Sprite):
-    def __init__(self, filepath: Path, **kwargs):
+    def __init__(self, image: pygame.surface, **kwargs):
         pygame.sprite.Sprite.__init__(self)
         
         self.world = None
         self.ID = None #unique int to world that gets assigned when object is added
         
-        self.filename = str(filepath)
-        self.image = pygame.image.load(filepath).convert_alpha()
+        self.image = image
         self.frame = 0
         self.subframe = 0
         self.framerate = kwargs.get('framerate', 60)
+        self.frame_sequence = kwargs.get('frame_sequence', None)
         self.animate = True
         
         #set to spritesheet size of 1 by default
@@ -82,12 +83,21 @@ class GameObject(pygame.sprite.Sprite):
             self.subframe = 0
         
             if self.animate == True:
-                self.frame += 1
-                if (self.frame) < self.matrixsize[0] * self.matrixsize[1]:
-                    self.set_sprite_index(self.frame)
-                else:
-                    self.set_sprite_index(0)
-                    self.frame = 0
+                if not self.frame_sequence:
+                    self.frame += 1
+                    if (self.frame) < self.matrixsize[0] * self.matrixsize[1]:
+                        self.set_sprite_index(self.frame)
+                    else:
+                        self.set_sprite_index(0)
+                        self.frame = 0
+                else: #if frame sequence
+                    self.set_sprite_index(self.frame_sequence[self.frame])
+                    
+                    if self.frame >= len(self.frame_sequence) - 1:
+                        self.frame = 0
+                    else:
+                        self.frame += 1
+                    
             elif self.animate == False:
                 self.set_sprite_index(0)
                 self.frame = 0
@@ -105,14 +115,14 @@ Class for handling non-physics objects such as backgrounds and UI elements
 Inherits from: GameObject
 
 args:
-    filepath: path to sprite file
+    image: pygame surface object for sprite
 kwargs:
     position: position on screen of the object
     angle: angle of the object
 '''
 class StaticObject(GameObject):
-    def __init__(self, filepath: Path, **kwargs):
-        GameObject.__init__(self, filepath, **kwargs)
+    def __init__(self, image: pygame.surface, **kwargs):
+        GameObject.__init__(self, image, **kwargs)
         self.position = kwargs.get('position', (0,0))
         self.angle = kwargs.get('angle', 0)
     
@@ -137,13 +147,13 @@ Gauge:
 Class for steam gauges
 
 args:
-    filepath: path to file for gauge
-    needlepath: path to file for needle
+    image: pygame surface for gauge
+    needle: pygame surface for needle
 '''
 class Gauge(StaticObject):
-    def __init__(self, filepath: Path, needlepath: Path, **kwargs):
-        StaticObject.__init__(self, filepath, **kwargs)
-        self.needle = StaticObject(needlepath, position = self.position)
+    def __init__(self, image: pygame.surface, needle: pygame.surface, **kwargs):
+        StaticObject.__init__(self, image, **kwargs)
+        self.needle = StaticObject(needle, position = self.position)
         self.gauge_range = kwargs.get('gauge_range', 3.6)
         
         self.needle_position = kwargs.get('needle_position', 0)
@@ -158,14 +168,14 @@ Button:
 Class for UI buttons
 
 args:
-    filepath: path to file for button
+    image: pygame surface object for button
 
 kwargs:
     callback: function to be executed when button is pressed
 '''
 class Button(StaticObject):
-    def __init__(self, filepath: Path, **kwargs):
-        StaticObject.__init__(self, filepath, **kwargs)
+    def __init__(self, image: pygame.surface, **kwargs):
+        StaticObject.__init__(self, image, **kwargs)
         self.callback = None
         self.pressed = False
         
@@ -200,7 +210,7 @@ Inherits from: GameObject
 
 args:
     space: pymunk space that the object exists in
-    filepath: path to sprite file
+    image: pygame surface object for sprite
 kwargs:
     hitbox: path to .json file containing object's hitbox
     shape: string defining the shape of the object (defaults to a box if no file or shape arg is given)
@@ -212,8 +222,8 @@ kwargs:
     velocity: velocity of the object
 '''
 class Entity(GameObject):
-    def __init__(self, space: pymunk.Space, filepath: Path, **kwargs):
-        GameObject.__init__(self, filepath, **kwargs)
+    def __init__(self, space: pymunk.Space, image: pygame.surface, **kwargs):
+        GameObject.__init__(self, image, **kwargs)
         
         self.radius = self.rect.height // 2
         if self.rect.width >= self.rect.height:
@@ -262,7 +272,9 @@ class Entity(GameObject):
         self.body.velocity = kwargs.get('velocity', (0,0))
         
         self.space = space
-        space.add(self.body, self.box)
+        
+        if space:
+            space.add(self.body, self.box)
     
     '''
     Set position of the object (this can maybe be removed)
@@ -310,7 +322,7 @@ Inherits from: Entity
 
 args:
     space: pymunk space that the object exists in
-    filepath: path to sprite file
+    image: pygame surface object for sprite
     projectile_filepath: path to projectile file
 kwargs:
     origin: object origin for attatching to a vehicle thru a pymunk joint (tuple)
@@ -320,8 +332,8 @@ kwargs:
     recoil: firing recoil force 
 '''
 class Weapon(Entity):
-    def __init__(self, space: pymunk.Space, filepath: Path, projectile_filepath: Path, **kwargs):
-        Entity.__init__(self, space, filepath, **kwargs)
+    def __init__(self, space: pymunk.Space, image: pygame.surface, projectile_filepath: Path, **kwargs):
+        Entity.__init__(self, space, image, **kwargs)
         
         self.projectile_filepath = projectile_filepath
         
@@ -342,7 +354,7 @@ class Weapon(Entity):
             
             L = -self.origin[0] + self.rect.width #get offset from mounting point
             
-            self.world.add(Entity(self.space, self.projectile_filepath,
+            self.world.add(Entity(self.space, load_image(self.projectile_filepath),
                             density = self.projectile_density, 
                             body_type = pymunk.Body.DYNAMIC, 
                             shape = 'circle',
@@ -361,7 +373,7 @@ Inherits From: Entity
 
 args:
     space: pymunk space that the object exists in
-    filepath: path to sprite file
+    image: pygame surface object for sprite
 kwargs:
     buoyancy: buoyancy of the ship
     center_of_gravity: relative location of the center of gravity
@@ -377,8 +389,8 @@ kwargs:
     NPC: Boolean describing if the ship is an NPC or Player
 '''
 class Ship(Entity):
-    def __init__(self, space: pymunk.Space, filepath: Path, **kwargs):
-        Entity.__init__(self, space, filepath, **kwargs)
+    def __init__(self, space: pymunk.Space, image: pygame.surface, **kwargs):
+        Entity.__init__(self, space, image, **kwargs)
 
         #ship physics
         self.min_buoyancy = kwargs.get('min_buoyancy', 1e6)
@@ -698,7 +710,15 @@ class Ship(Entity):
             self.space.add(cannon_copy.body)
             self.attatch_weapon(cannon_copy)
             self.cannon.body.angle = 3.14159 - self.cannon.body.angle #mirror about y axis
-            
+
+'''
+Invisible barrier for physics
+'''
+class Barrier:
+    def __init__(self, size, location):
+        self.body = pymunk.Body(0, 0, body_type = pymunk.Body.KINEMATIC)
+        self.box = pymunk.Poly.create_box(self.body, size)
+        
 '''
 EntityGroup:
 Class for storing entities in one location
@@ -722,6 +742,12 @@ class EntityGroup(pygame.sprite.Group):
             sprite.draw(surface)
 
 '''
+Load image from file and return
+'''
+def load_image(filepath):
+    return pygame.image.load(filepath).convert_alpha()
+
+'''
 Load entity from file and return it
 
 args:
@@ -736,12 +762,45 @@ def load_entity(filepath: Path, space, **kwargs):
         entity_data = json.load(f)
     
     if entity_data['type'] == 'Ship':
-        object = Ship(space, entity_data['image'], **entity_data, **kwargs)
+        object = Ship(space, load_image(entity_data['image_filename']), **entity_data, **kwargs)
     elif entity_data['type'] == 'Weapon':
         entity_data['projectile_filepath'] = os.path.join(os.path.dirname(filepath), entity_data['projectile_filepath']) #hacky fix so we have the full directory
-        object = Weapon(space, entity_data['image'], **entity_data, **kwargs)
+        object = Weapon(space, load_image(entity_data['image_filename']), **entity_data, **kwargs)
     else:
-        object = Entity(space, entity_data['image'], **entity_data, **kwargs)
+        object = Entity(space, load_image(entity_data['image_filename']), **entity_data, **kwargs)
     
     os.chdir(original_directory) #reset directory
     return object
+    
+'''
+Merge two entities into one
+
+args:
+    entity1: first entitiy to merge
+    entity2: second entity to merge
+    direction: direction to merge in (x or y)
+'''
+def merge(entity1, entity2, direction, **kwargs): #TODO: make this work with animations
+    if direction == 'y':
+        im1 = pygame.image.tobytes(entity1.image, 'RGBA')
+        im2 = pygame.image.tobytes(entity2.image, 'RGBA')
+        size = (entity1.image.get_width(), entity1.image.get_height()*2)
+        new_image = pygame.image.frombytes(im1 + im2, size, 'RGBA')
+    elif direction == 'x':
+        im1 = pygame.image.tobytes(entity1.image, 'RGBA')
+        im2 = pygame.image.tobytes(entity2.image, 'RGBA')
+        size = (entity1.image.get_width()*2, entity1.image.get_height())
+        
+        img_bytes = utils.interleave(im1, im2, entity1.image.get_width() * 4)
+        new_image = pygame.image.frombytes(img_bytes, size, 'RGBA')
+    else:
+        raise ValueError
+
+    new_entity = Entity(entity1.space, new_image, position = entity1.body.position, **kwargs)
+    
+    if entity1.space or entity2.space:
+        entity1.space.remove(entity1.body) #remove parents from physics space
+        if entity2 != entity1:
+            entity2.space.remove(entity2.body)
+    
+    return new_entity
