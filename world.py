@@ -2,6 +2,8 @@ import pygame
 import pymunk
 import time
 import math
+import os
+import json
 
 import entity
 
@@ -156,12 +158,14 @@ class World:
         view_x = round(self.camera[0]) - (screen_rect.width // 2) #MUST ROUND or it looks jittery
         view_y = round(self.camera[1]) - (screen_rect.height // 2)
         
-        if view_x < 0:
+        if view_x < 0: #don't show an out of bounds area with the camera
             view_x = 0
         if view_y < 0:
             view_y = 0
-        
-        #print("{} {}".format(view_x, view_y))
+        if (view_x + screen_rect.width) > self.map.get_width():
+            view_x = (self.map.get_width() - screen_rect.width)
+        if (view_y + screen_rect.height) > self.map.get_height():
+            view_y = (self.map.get_height() - screen_rect.height)
         
         self.entities.update(period)
 
@@ -220,3 +224,37 @@ class World:
         #calculate period for next frame
         self.fps = int(1.0/(time.time() - startloop + 1e-8))
         self.frame_period = 1.0/(self.fps + 1e-8)
+        
+'''
+Loads a map from a map file and returns it as a World object
+'''
+def load_map(filepath, screen, space, **kwargs):
+    original_directory = os.getcwd()
+    os.chdir(os.path.dirname(filepath)) #change current working directory
+
+    with open(os.path.basename(filepath)) as f:
+        map_data = json.load(f)
+    
+    with open(os.path.basename(map_data["tiledict"])) as f:
+        dict_file = json.load(f)
+    
+    tiledict = {}
+    for tile in dict_file:
+        pixel_tuple = tuple(map(int, tile.split(', ')))
+        tiledict[pixel_tuple] = dict_file[tile]
+    
+    mapimage = entity.load_image(map_data['mapimage']) #load map image to surface
+    
+    world_map = World(screen, (mapimage.get_width() * 16, mapimage.get_height() * 16), space,
+                      background_color = map_data["background_color"], **kwargs)
+    
+    for y in range(mapimage.get_height()):
+        for x in range(mapimage.get_width()):
+            pixel = tuple(mapimage.get_at((x,y)))
+            if pixel in tiledict: #if this pixel corresponds to an object in the dict, add as object
+                world_map.add(entity.Entity(space, entity.load_image(tiledict[pixel]),
+                          body_type = pymunk.Body.KINEMATIC,
+                          position = ((x * 16) + 8,(y * 16) + 8))) #load object
+    
+    os.chdir(original_directory) #reset directory
+    return world_map

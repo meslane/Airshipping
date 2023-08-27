@@ -1,0 +1,5 @@
+{
+"mapimage": "map1.png",
+"background_color": [170,255,255],
+"tiledict": "green.tiles"
+}

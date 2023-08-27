@@ -1,0 +1,5 @@
+Store map in 16x16 tiles
+
+-Have an image where each pixel corresponds to a single tile
+-A separate file indexes each pixel color with a tile object that can also have defined kwargs
+-This file also defines enemy positions

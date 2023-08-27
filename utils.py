@@ -108,20 +108,25 @@ Interleve two byte arrays
 args:
     a: first array
     b: second array
-    num: number of bytes to interleave
+    a_num: number of bytes in a to interleave
+    b_num: number of bytes in b to interleave
+    
+example:
+    interleave(a, b, 4, 2) = [a,a,a,a,b,b,a,a,a,a,b,b,...]
 '''
-def interleave(a, b, num):
+def interleave(a, b, a_num, b_num):
     c = bytes()
     
     a_index = 0
     b_index = 0
 
-    for i in range((len(a) + len(b))//(num  * 2)):
-        for j in range(num):
+    #for i in range((len(a) + len(b))//(a_num  + b_num)):
+    while (a_index < len(a)) and (b_index < len(b)):
+        for j in range(a_num):
             c += bytes([a[a_index]])
             a_index += 1
             
-        for j in range(num):
+        for j in range(b_num):
             c += bytes([b[b_index]])
             b_index += 1
             

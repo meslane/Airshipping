@@ -776,31 +776,63 @@ def load_entity(filepath: Path, space, **kwargs):
 Merge two entities into one
 
 args:
+    space: space to add merged entity to
     entity1: first entitiy to merge
     entity2: second entity to merge
     direction: direction to merge in (x or y)
 '''
-def merge(entity1, entity2, direction, **kwargs): #TODO: make this work with animations
+def merge(space, entity1, entity2, direction, **kwargs): #TODO: make this work with animations
     if direction == 'y':
         im1 = pygame.image.tobytes(entity1.image, 'RGBA')
         im2 = pygame.image.tobytes(entity2.image, 'RGBA')
-        size = (entity1.image.get_width(), entity1.image.get_height()*2)
+        size = (entity1.image.get_width(), entity1.image.get_height() + entity2.image.get_height())
         new_image = pygame.image.frombytes(im1 + im2, size, 'RGBA')
     elif direction == 'x':
         im1 = pygame.image.tobytes(entity1.image, 'RGBA')
         im2 = pygame.image.tobytes(entity2.image, 'RGBA')
-        size = (entity1.image.get_width()*2, entity1.image.get_height())
+        size = (entity1.image.get_width() + entity2.image.get_width(), entity1.image.get_height())
         
-        img_bytes = utils.interleave(im1, im2, entity1.image.get_width() * 4)
+        img_bytes = utils.interleave(im1, im2, entity1.image.get_width() * 4, entity2.image.get_width() * 4)
         new_image = pygame.image.frombytes(img_bytes, size, 'RGBA')
     else:
         raise ValueError
 
-    new_entity = Entity(entity1.space, new_image, position = entity1.body.position, **kwargs)
+    new_entity = Entity(space, new_image, position = entity1.body.position, **kwargs)
     
-    if entity1.space or entity2.space:
+    if entity1.space:
         entity1.space.remove(entity1.body) #remove parents from physics space
-        if entity2 != entity1:
-            entity2.space.remove(entity2.body)
+        entity1.space = None
+    
+    if entity2.space:
+        entity2.space.remove(entity2.body)
+        entity2.space = None
     
     return new_entity
+    
+'''
+Merge tile with itself n times
+'''
+def merge_n(space, entity, count, direction, **kwargs):
+    new_entity = entity
+    
+    for i in range(count):
+        new_entity = merge(space, entity, new_entity, direction, **kwargs)
+        
+    return new_entity
+    
+'''
+Tile an object but do not merge
+'''
+def tile_n(map, count, direction, space, image, **kwargs):
+    
+    for i in range(count):
+        tile = Entity(space, image, **kwargs)
+        
+        if direction == 'y':
+            tile.body.position = (tile.body.position[0], tile.body.position[1] - (count * tile.image.get_width() // 2) + (i * tile.image.get_width()))
+        elif direction == 'x':
+            tile.body.position = (tile.body.position[0] - (count * tile.image.get_height() // 2) + (i * tile.image.get_height()), tile.body.position[1])
+        else:
+            raise ValueError
+        
+        map.add(tile)
