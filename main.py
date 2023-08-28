@@ -41,15 +41,18 @@ def main(argv):
     alt_gauge = entity.Gauge(entity.load_image(os.path.join('Art', 'empty_gauge.png')), entity.load_image(os.path.join('Art', 'pointer.png')), position=(395,35), gauge_range = 2.9)
     autopilot_gauge = entity.Gauge(entity.load_image(os.path.join('Art', 'alt_gauge.png')), entity.load_image(os.path.join('Art', 'smallpointer.png')), position=(395,35), gauge_range = 2.9)
     
-    lift_gauge = entity.Gauge(entity.load_image(os.path.join('Art', 'lift_gauge.png')), entity.load_image(os.path.join('Art', 'pointer.png')), position=(135,322), gauge_range = 2.65)
+    lift_gauge = entity.Gauge(entity.load_image(os.path.join('Art', 'lift_gauge.png')), entity.load_image(os.path.join('Art', 'pointer.png')), position=(40,322), gauge_range = 2.65)
+    
+    '''
     engine_gauge = entity.Gauge(entity.load_image(os.path.join('Art', 'engine_order_2.png')), entity.load_image(os.path.join('Art', 'bigpointer.png')), position=(50,310), gauge_range = 2.65)
+    '''
     
     map.add_UI(temp_gauge)
     map.add_UI(fuel_gauge)
     map.add_UI(autopilot_gauge)
     map.add_UI(alt_gauge)
     map.add_UI(lift_gauge)
-    map.add_UI(engine_gauge)
+    #map.add_UI(engine_gauge)
     
     #map entities
     '''
@@ -151,6 +154,9 @@ def main(argv):
     run = True
     showFPS = True
     tick = 0
+    
+    pidfile = 'Telemetry/pid{}.csv'.format(int(time.time()))
+    
     while run:
         startloop = time.time()
         
@@ -196,10 +202,11 @@ def main(argv):
             alt_gauge.needle_position = 100 * utils.percent((1000,0), ship.body.position[1])
             autopilot_gauge.needle_position = 100 * utils.percent((1000,0), ship.PID_alt_setpoint)
             lift_gauge.needle_position = 100 * utils.percent((ship.min_buoyancy,ship.max_buoyancy), ship.buoyancy)
-            engine_gauge.needle_position = (ship.power / 4000) + 50
+            #engine_gauge.needle_position = (ship.power / 4000) + 50
             
             #tick (THIS GOES LAST)
             map.tick(startloop)
+            ship.write_PID_alt_csv(pidfile)
         
         elif (state == "Menu"):
             main_menu.tick(startloop)

@@ -1,4 +1,9 @@
 {
-"79, 103, 129, 255": "../tiles/bricktile.png",
-"99, 198, 77, 255": "../tiles/grasstile.png"
+"79, 103, 129, 255": {"image_file": "../tiles/bricktile.png"},
+"99, 198, 77, 255": {"image_file": "../tiles/grasstile.png"},
+"116, 63, 57, 255": {"image_file": "../tiles/box.png",
+                     "physics": "dynamic"},
+"228, 166, 114, 255": {"image_file": "../tiles/ramp.png",
+                       "hitbox": "../tiles/ramp.box",
+                       "physics": "dynamic"}
 }

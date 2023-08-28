@@ -13,6 +13,7 @@ import utils
 import os
 import time
 import copy
+import csv
 
 REFERENCE_PERIOD = 1.0/120.0
 
@@ -477,12 +478,33 @@ class Ship(Entity):
                 else:
                     if (self.PID_alt_setpoint < 1000):
                         self.PID_alt_setpoint += 5 * (period / REFERENCE_PERIOD)
+            
+            #throttle
             if keys[pygame.K_a]: #throttle back
+                if self.power > -self.max_power:
+                    self.power -= 1600 * (period / REFERENCE_PERIOD)
+                '''
                 if (self.power > -self.max_power):
                     self.power -= 1600 * (period / REFERENCE_PERIOD)
-            if keys[pygame.K_d]: #throttle forward
+                '''
+            elif keys[pygame.K_d]: #throttle forward
+                if self.power < self.max_power:
+                    self.power += 1600 * (period / REFERENCE_PERIOD)
+                '''
                 if (self.power < self.max_power):
                     self.power += 1600 * (period / REFERENCE_PERIOD)
+                '''
+            else:
+                if self.power > 0:
+                    self.power -= 1600
+                    if self.power < 1600:
+                        self.power = 0
+                    
+                elif self.power < 0:
+                    self.power += 1600
+                    if self.power > -1600:
+                        self.power = 0
+                
             if keys[pygame.K_x]: #cut throttle
                 self.power = 0
             
@@ -541,9 +563,19 @@ class Ship(Entity):
             self.power = self.max_power
         elif (self.power < -self.max_power):
             self.power = -self.max_power
+            
+        self.prev_pos_error = error
+        self.pos_error_sum += error
         
         #print("kP={}, kI={}, kD={}".format(k_P,k_I,k_D))
     
+    '''
+    Write PID altitude data to csv file
+    '''
+    def write_PID_alt_csv(self, filename):
+        with open(filename, 'a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([self.world.physics_step_count, self.PID_alt_setpoint, self.body.position[1]])
     
     '''
     Helper function to get the number of objects between self and target

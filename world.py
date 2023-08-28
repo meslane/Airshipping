@@ -54,6 +54,8 @@ class World:
         self.physics_step = kwargs.get('physics_step', 1.0/480.0)
         self.background_color = kwargs.get('background_color', (0,0,0))
         
+        self.physics_step_count = 0 #increments every physics step
+        
         self.key_callback = kwargs.get('key_callback', None)
         
         self.clock = pygame.time.Clock()
@@ -214,6 +216,7 @@ class World:
             for i in range(int(self.frame_period/self.physics_step)):
                 self.physics()
                 self.space.step(self.physics_step) #more steps for lower FPS
+                self.physics_step_count += 1
         
         #scheduler code to run tasks
         for task in self.tasks:
@@ -226,7 +229,7 @@ class World:
         self.frame_period = 1.0/(self.fps + 1e-8)
         
 '''
-Loads a map from a map file and returns it as a World object
+Loads a map of 16x16 tiles from a map file and returns it as a World object
 '''
 def load_map(filepath, screen, space, **kwargs):
     original_directory = os.getcwd()
@@ -241,19 +244,42 @@ def load_map(filepath, screen, space, **kwargs):
     tiledict = {}
     for tile in dict_file:
         pixel_tuple = tuple(map(int, tile.split(', ')))
-        tiledict[pixel_tuple] = dict_file[tile]
+        tiledict[pixel_tuple] = {'image_file': dict_file[tile]['image_file']} #load image into dict
+        
+        if 'hitbox' in dict_file[tile]: #load hitbox if specified in tile dict
+            tiledict[pixel_tuple]['hitbox'] = dict_file[tile]['hitbox']
+        else:
+            tiledict[pixel_tuple]['hitbox'] = None
+            
+        if 'physics' in dict_file[tile]: #load physics settings if specified
+            if dict_file[tile]['physics'] == 'dynamic':
+                tiledict[pixel_tuple]['physics'] = pymunk.Body.DYNAMIC
+            elif dict_file[tile]['physics'] == 'kinematic':
+                tiledict[pixel_tuple]['physics'] = pymunk.Body.KINEMATIC
+            else:
+                tiledict[pixel_tuple]['physics'] = None
+        else:
+            tiledict[pixel_tuple]['physics'] = pymunk.Body.KINEMATIC
     
     mapimage = entity.load_image(map_data['mapimage']) #load map image to surface
     
     world_map = World(screen, (mapimage.get_width() * 16, mapimage.get_height() * 16), space,
-                      background_color = map_data["background_color"], **kwargs)
+                      background_color = map_data["background_color"], **kwargs) #create world from image dimensions
     
     for y in range(mapimage.get_height()):
         for x in range(mapimage.get_width()):
             pixel = tuple(mapimage.get_at((x,y)))
             if pixel in tiledict: #if this pixel corresponds to an object in the dict, add as object
-                world_map.add(entity.Entity(space, entity.load_image(tiledict[pixel]),
-                          body_type = pymunk.Body.KINEMATIC,
+                if tiledict[pixel]['physics'] == None: #make background object if specified
+                    tile_space = None #don't simulate physics
+                    tile_bodytype = pymunk.Body.KINEMATIC
+                else:
+                    tile_space = space
+                    tile_bodytype = tiledict[pixel]['physics']
+            
+                world_map.add(entity.Entity(tile_space, entity.load_image(tiledict[pixel]['image_file']),
+                          body_type = tile_bodytype,
+                          hitbox = tiledict[pixel]['hitbox'],
                           position = ((x * 16) + 8,(y * 16) + 8))) #load object
     
     os.chdir(original_directory) #reset directory

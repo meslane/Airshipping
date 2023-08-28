@@ -10,9 +10,9 @@
 "center_of_buoyancy": [0,-20],
 "min_buoyancy": 1.2e6,
 "max_buoyancy": 1.55e6,
-"alt_P": 0.5,
-"alt_I": 1e-4,
-"alt_D": 0.1,
+"alt_P": 9,
+"alt_I": 0e-4,
+"alt_D": 10,
 "pos_P": 20,
 "pos_I": 0,
 "pos_D": 0
