@@ -11,3 +11,9 @@ Pymunk overwrites custom mass unless it is adjusted after body addition to the s
 Set density instead of mass
 
 Should find a way to wrap Scene and World into a single class
+
+For collisions, should assign a unique number and collision ID for each ship and use its arbiter to calculate damage
+
+Need a unified system for killing objects (done)
+
+Flipping objects seems to leave some strange dangling shapes that messes with collision detection and object deletion

@@ -272,10 +272,21 @@ class Entity(GameObject):
         self.body.position = kwargs.get('position', (0,0))
         self.body.velocity = kwargs.get('velocity', (0,0))
         
+        self.hp = kwargs.get('hp', 100)
+        self.max_hp = self.hp
+        
         self.space = space
         
         if space:
             space.add(self.body, self.box)
+    
+    '''
+    Destructor
+    '''
+    '''
+    def __del__(self):
+        self.space.remove(self.body)
+    '''
     
     '''
     Set position of the object (this can maybe be removed)
@@ -345,6 +356,7 @@ class Weapon(Entity):
         self.projectile_velocity = kwargs.get('projectile_velocity', 500)
         self.projectile_density = kwargs.get('projectile_density', 250)
         self.recoil = kwargs.get('recoil', 500000)
+        self.projectile_collision_type = kwargs.get('projectile_collision_type', 1)
         
     '''
     Shoot the cannon
@@ -362,7 +374,8 @@ class Weapon(Entity):
                             position = (self.body.position[0] + (L * math.cos(self.body.angle)), 
                                         self.body.position[1] + (L * math.sin(self.body.angle))),
                             velocity = (self.projectile_velocity * math.cos(self.body.angle), 
-                                        self.projectile_velocity * math.sin(self.body.angle))))
+                                        self.projectile_velocity * math.sin(self.body.angle)),
+                            collision_type = self.projectile_collision_type)) #projectile collision type
             
             self.body.apply_force_at_local_point(force = (-self.recoil, 0), 
                                                  point = (L, 0)) #NOTE: force applied is local to body, not world. angle compensation is not needed
@@ -575,7 +588,7 @@ class Ship(Entity):
     def write_PID_alt_csv(self, filename):
         with open(filename, 'a', newline='') as f:
             writer = csv.writer(f)
-            writer.writerow([self.world.physics_step_count, self.PID_alt_setpoint, self.body.position[1]])
+            writer.writerow([self.world.physics_step_count, self.PID_alt_setpoint, self.body.position[1], self.buoyancy])
     
     '''
     Helper function to get the number of objects between self and target
@@ -724,10 +737,34 @@ class Ship(Entity):
             new_vertices.append((-vertex.x, vertex.y))
         
         #flip bounding box
+        density = self.box.density #preserve material properties
+        collision_type = self.box.collision_type
+        elasticity = self.box.elasticity
+        friction = self.box.friction
+        position = self.body.position
+        velocity = self.body.velocity
+        center_of_gravity = self.body.center_of_gravity
+        
+        self.space.remove(self.body)
+        self.space.remove(self.box)
+        
+        self.box = None
+        self.body = pymunk.Body(0, 0, body_type = pymunk.Body.DYNAMIC)
         self.box = pymunk.Poly(self.body, new_vertices)
         self.body.moment = pymunk.moment_for_poly(mass = self.body.mass,
-                                                              vertices = new_vertices,
-                                                              offset = self.center_of_gravity)
+                                                      vertices = new_vertices,
+                                                      offset = self.center_of_gravity)
+
+        self.body.velocity = velocity
+        self.box.collision_type = collision_type
+        self.box.elasticity = elasticity
+        self.box.friction = friction
+        self.box.density = density
+        
+        self.space.add(self.body, self.box)
+        
+        self.body.center_of_gravity = center_of_gravity #must set after addition to space
+        self.body.position = position #must set after adjusting CG
 
         if self.cannon: #this kind of sucks but it works
             cannon_copy = copy.copy(self.cannon)
@@ -742,6 +779,20 @@ class Ship(Entity):
             self.space.add(cannon_copy.body)
             self.attatch_weapon(cannon_copy)
             self.cannon.body.angle = 3.14159 - self.cannon.body.angle #mirror about y axis
+        
+    '''
+    Handle collisions and deal damage
+    '''
+    def collision_handler(self, arbiter, space, data):
+        mag_impulse = math.sqrt(arbiter.total_impulse[0] ** 2 + arbiter.total_impulse[1] ** 2)
+        if mag_impulse > 10000: #filter out things like rubbing
+            damage = (0.5 * mag_impulse)/self.body.mass
+        else:
+            damage = 0
+            
+        self.hp -= damage
+        print("hp:{} impulse{}".format(self.hp, mag_impulse))
+        return True
 
 '''
 Invisible barrier for physics

@@ -7,5 +7,6 @@
 "projectile_density": 10,
 "projectile_velocity": 1000,
 "recoil": 2e7,
-"cooldown": 0.7
+"cooldown": 0.7,
+"projectile_collision_type": 2
 }

@@ -55,11 +55,6 @@ def main(argv):
     #map.add_UI(engine_gauge)
     
     #map entities
-    '''
-    map.add(entity.Entity(space, entity.load_image(os.path.join('Art', 'floor.png')),
-                          body_type = pymunk.Body.KINEMATIC,
-                          position = (500,900)))
-    '''
     
     ship = entity.load_entity(os.path.join('Assets\Player_Ship', 'blimp.info'), space, position = (500,820))
     map.add(ship)
@@ -71,65 +66,18 @@ def main(argv):
     cannon = entity.load_entity(os.path.join('Assets\Cannon_1', 'cannon.info'), space)
     map.add(cannon)
     ship.attatch_weapon(cannon)
-    
-    '''
+
     enemy = entity.load_entity(os.path.join('Assets\Enemy_Ship_1', 'Enemy_1.info'), space, position = (700,820), NPC = True)
     enemy.PID_alt_setpoint = 300
     enemy.PID_pos_setpoint = 1000
     enemy.navigate = True
     enemy.target_ID = ship.ID
     map.add(enemy)
-    '''
-    
-    '''
-    map.add(entity.Entity(space, entity.load_image(os.path.join('Art', 'wall.png')),
-                        density = 10,  body_type = pymunk.Body.DYNAMIC,
-                        position = (616,770)))
-
-    for i in range(20):
-        map.add(entity.Entity(space, entity.load_image(os.path.join('Art', 'box.png')),
-                        density = 1,  body_type = pymunk.Body.DYNAMIC,
-                        position = (600, 890 - (i * 15))))
-    '''
-
     map.focus = ship.ID
+    
     print(map.focus)
     print(map.entities)
     
-    #tile = entity.Entity(space, entity.load_image(os.path.join('Art', 'grasstile.png')), position = (1000,500))
-    #tile = entity.merge(tile, tile, 'x', body_type = pymunk.Body.KINEMATIC)
-    #tile = entity.merge_n(None, tile, 110, 'x', body_type = pymunk.Body.KINEMATIC)
-    '''
-    for i in range(500):
-        tile = entity.Entity(space, entity.load_image(os.path.join('Art', 'grasstile.png')), 
-                             position = (200 + (i * 16),500), 
-                             body_type = pymunk.Body.KINEMATIC)
-        map.add(tile)
-    '''
-    '''
-    entity.tile_n(map, 8, 'x', space, entity.load_image(os.path.join('Art', 'grasstile.png')),
-                    position = (500,500), 
-                    body_type = pymunk.Body.KINEMATIC)
-    
-    grass = entity.Entity(None, entity.load_image(os.path.join('Assets', 'Tiles', 'top_grass.png')), 
-                            position = (200,500-16),
-                            matrixsize = (3,1),
-                            spritesize = (16,16),
-                            framerate = 2,
-                            frame_sequence = [0, 1, 2, 1])
-    grass = entity.merge(None, grass, grass, 'x', matrixsize = (3,1),
-                            spritesize = (32,16),
-                            framerate = 2,
-                            frame_sequence = [0, 1, 2, 1])
-    map.add(grass)
-    '''
-    
-    #make barriers
-    '''
-    entity.tile_n(map, 1250, 'x', space, entity.load_image(os.path.join('Assets', 'Tiles', 'empty.png')),
-                    position = (5000,996), 
-                    body_type = pymunk.Body.KINEMATIC)
-    '''
     
     '''
     Main Menu
@@ -198,6 +146,7 @@ def main(argv):
         '''
         if (state == "Game"):
             #update gauges
+            temp_gauge.needle_position = 100 * ((ship.max_hp - ship.hp)/ship.max_hp)
             fuel_gauge.needle_position = ship.fuel
             alt_gauge.needle_position = 100 * utils.percent((1000,0), ship.body.position[1])
             autopilot_gauge.needle_position = 100 * utils.percent((1000,0), ship.PID_alt_setpoint)

@@ -65,8 +65,13 @@ class World:
         
         self.next_ID = 0
         
+        #do tasks
         self.tasks = []
         self.tasks.append(Task(self.pathfind, 1))
+        self.tasks.append(Task(self.cull_dead, 0.1))
+        
+        #collision handlers dict
+        self.handlers = {}
     
     '''
     Add an entity to the world
@@ -74,11 +79,17 @@ class World:
     args:
         entity: the entity object to add
     '''
-    def add(self, entity):
-        entity.world = self
-        entity.ID = self.next_ID
+    def add(self, object):
+        object.world = self
+        object.ID = self.next_ID
         self.next_ID += 1
-        self.entities.add(entity)
+        self.entities.add(object)
+        
+        #add collision handler for ship
+        if isinstance(object, entity.Ship):
+            object.box.collision_type = object.ID
+            self.handlers[object.ID] = self.space.add_collision_handler(2, object.ID)
+            self.handlers[object.ID].post_solve = object.collision_handler
         
     '''
     Add a UI element to the world
@@ -104,6 +115,19 @@ class World:
                 return entity
                 
         return None
+    
+    '''
+    Remove entity from world and space before deleting
+    '''
+    def kill_entity(self, ID):
+        entity = self.get_entity(ID)
+        self.space.remove(entity.body, entity.box)
+        self.entities.remove(entity)
+        
+        if ID in self.handlers:
+            del self.handlers[ID]
+        
+        del entity
     
     '''
     Translate all entities within the world
@@ -149,13 +173,17 @@ class World:
             entity_pos = entity.body.position
             
             if (entity_pos[0] < 0):
-                self.entities.remove(entity)
+                #self.entities.remove(entity)
+                self.kill_entity(entity.ID)
             elif (entity_pos[0] > map_rect.width):
-                self.entities.remove(entity)
+                #self.entities.remove(entity)
+                self.kill_entity(entity.ID)
             elif (entity_pos[1] < 0):
-                self.entities.remove(entity)
+                #self.entities.remove(entity)
+                self.kill_entity(entity.ID)
             elif (entity_pos[1] > map_rect.height):
-                self.entities.remove(entity)
+                #self.entities.remove(entity)
+                self.kill_entity(entity.ID)
         
         view_x = round(self.camera[0]) - (screen_rect.width // 2) #MUST ROUND or it looks jittery
         view_y = round(self.camera[1]) - (screen_rect.height // 2)
@@ -189,6 +217,14 @@ class World:
         for object in self.entities.sprites(): #pathfind entities
             if isinstance(object, entity.Ship) and object.NPC and object.target_ID:
                 object.pathfind(object.target_ID)
+    
+    '''
+    Kill all dead entities
+    '''
+    def cull_dead(self, *args):
+        for object in self.entities.sprites():
+            if isinstance(object, entity.Ship) and object.hp <= 0:
+                self.kill_entity(object.ID)
     
     '''
     Advance one frame and do physics
