@@ -16,7 +16,7 @@
 "pos_P": 20,
 "pos_I": 0,
 "pos_D": 0,
-"vulnerability": 0.25,
+"vulnerability": 0.5,
 "frags": [
             {
             "image": "Enemy_1_Frag_1.png",
@@ -36,7 +36,12 @@
             {
             "image": "Enemy_1_Frag_4.png",
             "box": "Enemy_1_Frag_4.box",
-            "relative_position": [0,-20]
+            "relative_position": [0,-15]
+            },
+            {
+            "image": "Enemy_1_Frag_5.png",
+            "box": "Enemy_1_Frag_5.box",
+            "relative_position": [5,15]
             }
          ]
 }

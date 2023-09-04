@@ -280,14 +280,11 @@ class Entity(GameObject):
         
         if space:
             space.add(self.body, self.box)
-    
-    '''
-    Destructor
-    '''
-    '''
-    def __del__(self):
-        self.space.remove(self.body)
-    '''
+            
+        self.categories = kwargs.get('categories', 0b1)
+        self.mask = kwargs.get('mask', 65535)
+            
+        self.box.filter = pymunk.ShapeFilter(categories=self.categories, mask=self.mask) #layer for pymunk collisions
     
     '''
     Set position of the object (this can maybe be removed)
@@ -370,12 +367,39 @@ class Entity(GameObject):
         
         self.body.center_of_gravity = center_of_gravity #must set after addition to space
         self.body.position = position #must set after adjusting CG
+        self.box.filter = pymunk.ShapeFilter(categories=self.categories, mask=self.mask) #layer for pymunk collisions
 
     '''
     Cast to string for debug
     '''
     def __str__(self):
         return("pos:{} vel:{} cg:{}".format(self.body.position, self.body.velocity, self.body.center_of_gravity))
+
+'''
+Particle: 
+Class defining particles for particle effects
+Inherits from: Entity
+'''
+class Particle(Entity):
+    def __init__(self, space: pymunk.Space, radius: int, color: tuple, normal_force: float, **kwargs):
+        p_surface = pygame.Surface((radius * 2, radius * 2))
+        pygame.draw.circle(p_surface, color, (radius, radius), radius)
+        p_surface = p_surface.convert_alpha()
+        p_surface.set_colorkey((0, 0, 0)) #remove black pixels
+        Entity.__init__(self, space, p_surface, shape = 'circle', **kwargs)
+        
+        self.normal_force = normal_force
+        self.body.mass = 1
+        
+        self.birthday = time.time()
+        self.lifespan = kwargs.get('lifespan', 1e9) #life of particle before it gets removed
+        
+        self.body.apply_impulse_at_local_point(kwargs.get('velocity', (0,0)))
+
+        self.box.filter = pymunk.ShapeFilter(categories=2, mask=1) #ignore self collisions
+
+    def physics_update(self): #offset gravity
+        self.body.apply_force_at_world_point((0,self.normal_force), self.body.position)
 
 '''
 Weapon:
@@ -781,48 +805,11 @@ class Ship(Entity):
     '''
     def flip(self):
         if not self.flipped:
-            self.image = pygame.transform.flip(self.original_image, True, False)
             self.hardpoint_position = (-self.original_hardpoint[0], self.original_hardpoint[1])
-            self.flipped = True
         else:
-            self.image = self.original_image
             self.hardpoint_position = self.original_hardpoint
-            self.flipped = False
-            
-        new_vertices = []
-            
-        for vertex in self.box.get_vertices():
-            new_vertices.append((-vertex.x, vertex.y))
-        
-        #flip bounding box
-        density = self.box.density #preserve material properties
-        collision_type = self.box.collision_type
-        elasticity = self.box.elasticity
-        friction = self.box.friction
-        position = self.body.position
-        velocity = self.body.velocity
-        center_of_gravity = self.body.center_of_gravity
-        
-        self.space.remove(self.body)
-        self.space.remove(self.box)
-        
-        self.box = None
-        self.body = pymunk.Body(0, 0, body_type = pymunk.Body.DYNAMIC)
-        self.box = pymunk.Poly(self.body, new_vertices)
-        self.body.moment = pymunk.moment_for_poly(mass = self.body.mass,
-                                                      vertices = new_vertices,
-                                                      offset = self.center_of_gravity)
-
-        self.body.velocity = velocity
-        self.box.collision_type = collision_type
-        self.box.elasticity = elasticity
-        self.box.friction = friction
-        self.box.density = density
-        
-        self.space.add(self.body, self.box)
-        
-        self.body.center_of_gravity = center_of_gravity #must set after addition to space
-        self.body.position = position #must set after adjusting CG
+    
+        Entity.flip(self)
 
         if self.cannon: #this kind of sucks but it works
             cannon_copy = copy.copy(self.cannon)

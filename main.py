@@ -74,8 +74,7 @@ def main(argv):
     enemy.target_ID = ship.ID
     map.add(enemy)
     map.focus = ship.ID
-    
-    
+                                
     '''
     Main Menu
     '''
@@ -152,7 +151,7 @@ def main(argv):
             
             #tick (THIS GOES LAST)
             map.tick(startloop)
-            ship.write_PID_alt_csv(pidfile)
+            #ship.write_PID_alt_csv(pidfile)
         
         elif (state == "Menu"):
             main_menu.tick(startloop)

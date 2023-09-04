@@ -4,9 +4,11 @@ import time
 import math
 import os
 import json
+import random
 
 import entity
 
+explosion_colors = [(251,146,43), (79,103,129), (175,191,210)]
 
 '''
 Task:
@@ -68,7 +70,8 @@ class World:
         #do tasks
         self.tasks = []
         self.tasks.append(Task(self.pathfind, 1))
-        self.tasks.append(Task(self.cull_dead, 0.1))
+        self.tasks.append(Task(self.cull_dead, 0.05))
+        self.tasks.append(Task(self.cull_particles, 0.1))
         
         #collision handlers dict
         self.handlers = {}
@@ -138,6 +141,26 @@ class World:
                                     
                 if object.flipped:
                     frag_object.flip()
+                
+                #explode
+                impulse_mag = 0.5e5
+                dir_mag = math.sqrt(frag['relative_position'][0] ** 2 + frag['relative_position'][1] ** 2)
+                impulse = [(frag['relative_position'][0]/dir_mag) * impulse_mag, 
+                           (frag['relative_position'][1]/dir_mag) * impulse_mag]
+                
+                if object.flipped:
+                    impulse[0] *= -1
+                
+                frag_object.body.apply_impulse_at_local_point(impulse)
+                
+                for i in range(50):
+                    p = entity.Particle(self.space, 1, explosion_colors[random.randint(0,2)], -200, 
+                    position = (object.body.position[0] + random.randint(-10,10),
+                                object.body.position[1] + random.randint(-10,10)), 
+                    lifespan = random.uniform(1,5), 
+                    velocity = (random.randint(-impulse_mag/200,impulse_mag/200), 
+                                random.randint(-impulse_mag/200,impulse_mag/200)))
+                    self.add(p)
         
         self.space.remove(object.body, object.box)
         self.entities.remove(object)
@@ -180,7 +203,7 @@ class World:
         screen_rect = screen.get_rect()
         map_rect = self.map.get_rect()
         
-        if self.focus:
+        if self.focus and self.get_entity(self.focus):
             entity_pos = self.get_entity(self.focus).body.position
             entity_radius = self.get_entity(self.focus).radius
             
@@ -242,6 +265,17 @@ class World:
     def cull_dead(self, *args):
         for object in self.entities.sprites():
             if isinstance(object, entity.Ship) and object.hp <= 0:
+                self.kill_entity(object.ID)
+    
+    
+    '''
+    Kill all expired particles
+    '''
+    def cull_particles(self, *args):
+        curtime = time.time()
+    
+        for object in self.entities.sprites():
+            if isinstance(object, entity.Particle) and (curtime >= object.birthday + object.lifespan):
                 self.kill_entity(object.ID)
     
     '''
