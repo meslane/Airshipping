@@ -75,9 +75,6 @@ def main(argv):
     map.add(enemy)
     map.focus = ship.ID
     
-    print(map.focus)
-    print(map.entities)
-    
     
     '''
     Main Menu

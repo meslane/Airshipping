@@ -120,14 +120,32 @@ class World:
     Remove entity from world and space before deleting
     '''
     def kill_entity(self, ID):
-        entity = self.get_entity(ID)
-        self.space.remove(entity.body, entity.box)
-        self.entities.remove(entity)
+        object = self.get_entity(ID)
+        
+        if isinstance(object, entity.Ship): #spawn frags
+            for frag in object.frags:
+                if object.flipped:
+                    new_position = [object.body.position[0] - frag['relative_position'][0], 
+                                    object.body.position[1] + frag['relative_position'][1]]
+                else:
+                    new_position = [object.body.position[0] + frag['relative_position'][0], 
+                                    object.body.position[1] + frag['relative_position'][1]]
+            
+                frag_object = entity.Entity(self.space, entity.load_image(frag['image']),
+                                            hitbox = frag['box'],
+                                            position = new_position)
+                self.add(frag_object)
+                                    
+                if object.flipped:
+                    frag_object.flip()
+        
+        self.space.remove(object.body, object.box)
+        self.entities.remove(object)
         
         if ID in self.handlers:
             del self.handlers[ID]
         
-        del entity
+        del object
     
     '''
     Translate all entities within the world

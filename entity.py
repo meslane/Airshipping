@@ -272,8 +272,9 @@ class Entity(GameObject):
         self.body.position = kwargs.get('position', (0,0))
         self.body.velocity = kwargs.get('velocity', (0,0))
         
-        self.hp = kwargs.get('hp', 100)
-        self.max_hp = self.hp
+        #flipping
+        self.original_image = self.image
+        self.flipped = False #facing to the right (False) or left (True)
         
         self.space = space
         
@@ -324,6 +325,55 @@ class Entity(GameObject):
             new_rect = rotated_surface.get_rect(center = self.surface.get_rect(topleft = self.rect.topleft).center)
             drawsurface.blit(rotated_surface, new_rect.topleft)
 
+    '''  
+    Flip
+    '''
+    def flip(self):
+        if not self.flipped:
+            self.image = pygame.transform.flip(self.original_image, True, False)
+            self.flipped = True
+        else:
+            self.image = self.original_image
+            self.flipped = False
+            
+        new_vertices = []
+            
+        for vertex in self.box.get_vertices():
+            new_vertices.append((-vertex.x, vertex.y))
+        
+        #flip bounding box
+        density = self.box.density #preserve material properties
+        collision_type = self.box.collision_type
+        elasticity = self.box.elasticity
+        friction = self.box.friction
+        position = self.body.position
+        velocity = self.body.velocity
+        center_of_gravity = self.body.center_of_gravity
+        
+        self.space.remove(self.body)
+        self.space.remove(self.box)
+        
+        self.box = None
+        self.body = pymunk.Body(0, 0, body_type = pymunk.Body.DYNAMIC)
+        self.box = pymunk.Poly(self.body, new_vertices)
+        self.body.moment = pymunk.moment_for_poly(mass = self.body.mass,
+                                                      vertices = new_vertices,
+                                                      offset = self.center_of_gravity)
+
+        self.body.velocity = velocity
+        self.box.collision_type = collision_type
+        self.box.elasticity = elasticity
+        self.box.friction = friction
+        self.box.density = density
+        
+        self.space.add(self.body, self.box)
+        
+        self.body.center_of_gravity = center_of_gravity #must set after addition to space
+        self.body.position = position #must set after adjusting CG
+
+    '''
+    Cast to string for debug
+    '''
     def __str__(self):
         return("pos:{} vel:{} cg:{}".format(self.body.position, self.body.velocity, self.body.center_of_gravity))
 
@@ -456,6 +506,14 @@ class Ship(Entity):
         #flipping
         self.original_image = self.image
         self.original_hardpoint = self.hardpoint_position
+        
+        #health
+        self.hp = kwargs.get('hp', 100)
+        self.max_hp = self.hp
+        self.vulnerability = kwargs.get('vulnerability', 0.2)
+        
+        #destruction frags:
+        self.frags = []
     
     '''
     Move ship by keypress
@@ -786,12 +844,12 @@ class Ship(Entity):
     def collision_handler(self, arbiter, space, data):
         mag_impulse = math.sqrt(arbiter.total_impulse[0] ** 2 + arbiter.total_impulse[1] ** 2)
         if mag_impulse > 10000: #filter out things like rubbing
-            damage = (0.5 * mag_impulse)/self.body.mass
+            damage = (self.vulnerability * mag_impulse)/self.body.mass
         else:
             damage = 0
             
         self.hp -= damage
-        print("hp:{} impulse{}".format(self.hp, mag_impulse))
+        #print("hp:{} impulse{}".format(self.hp, mag_impulse))
         return True
 
 '''
@@ -851,6 +909,16 @@ def load_entity(filepath: Path, space, **kwargs):
         object = Weapon(space, load_image(entity_data['image_filename']), **entity_data, **kwargs)
     else:
         object = Entity(space, load_image(entity_data['image_filename']), **entity_data, **kwargs)
+    
+    if 'frags' in entity_data:
+        object.frags = entity_data['frags']
+        for frag in object.frags:
+            frag['image'] = str(os.path.dirname(filepath)) + '\\' + frag['image']
+            
+            if 'box' in frag:
+                frag['box'] = str(os.path.dirname(filepath)) + '\\' + frag['box']
+            else:
+                frag['box'] = None
     
     os.chdir(original_directory) #reset directory
     return object
