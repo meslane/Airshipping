@@ -15,6 +15,7 @@ import utils
 
 def main(argv):
     pygame.init()
+    pygame.mixer.init()
     
     pygame.display.set_caption("Airshipping")
     window = pygame.display.set_mode([640,360], pygame.SCALED | pygame.RESIZABLE)
@@ -27,13 +28,7 @@ def main(argv):
     '''
     Overworld
     '''
-    map = world.load_map(os.path.join('Assets', 'Maps', 'world1.map'), screen, space, do_physics = True) #for test only
-    
-    '''
-    map = world.World(screen, (10000, 1000), space,
-                      do_physics = True,
-                      background_color = (170,255,255))
-    '''
+    map = world.load_map(os.path.join('Assets', 'Maps', 'world1.map'), screen, space, do_physics = True)
     
     #init UI steam gauges
     temp_gauge = entity.Gauge(entity.load_image(os.path.join('Art', 'temp_gauge.png')), entity.load_image(os.path.join('Art', 'pointer.png')), position=(245,35), gauge_range = 2.9)
@@ -42,10 +37,6 @@ def main(argv):
     autopilot_gauge = entity.Gauge(entity.load_image(os.path.join('Art', 'alt_gauge.png')), entity.load_image(os.path.join('Art', 'smallpointer.png')), position=(395,35), gauge_range = 2.9)
     
     lift_gauge = entity.Gauge(entity.load_image(os.path.join('Art', 'lift_gauge.png')), entity.load_image(os.path.join('Art', 'pointer.png')), position=(40,322), gauge_range = 2.65)
-    
-    '''
-    engine_gauge = entity.Gauge(entity.load_image(os.path.join('Art', 'engine_order_2.png')), entity.load_image(os.path.join('Art', 'bigpointer.png')), position=(50,310), gauge_range = 2.65)
-    '''
     
     map.add_UI(temp_gauge)
     map.add_UI(fuel_gauge)
@@ -67,12 +58,14 @@ def main(argv):
     map.add(cannon)
     ship.attatch_weapon(cannon)
 
-    enemy = entity.load_entity(os.path.join('Assets\Enemy_Ship_1', 'Enemy_1.info'), space, position = (700,820), NPC = True)
-    enemy.PID_alt_setpoint = 300
-    enemy.PID_pos_setpoint = 1000
-    enemy.navigate = True
-    enemy.target_ID = ship.ID
-    map.add(enemy)
+    for i in range(10):
+        enemy = entity.load_entity(os.path.join('Assets\Enemy_Ship_1', 'Enemy_1.info'), space, 
+        position = (random.randint(100,4000),random.randint(100,900)), 
+        NPC = True)
+        enemy.navigate = True
+        enemy.target_ID = ship.ID
+        map.add(enemy)
+    
     map.focus = ship.ID
                                 
     '''
@@ -94,6 +87,12 @@ def main(argv):
                                 position = (640//2, 360//2 + 30))
     main_menu.add_UI(load_button)
     
+    '''
+    Pause Menu
+    '''
+    pause_menu = world.World(screen, (640, 360), None,
+                            background_color = (79,103,129))
+    
     state = "Menu"
     run = True
     showFPS = True
@@ -107,14 +106,17 @@ def main(argv):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
-            if event.type == pygame.KEYUP:
-                if event.key == pygame.K_f:
-                    ship.flip()
+            if event.type == pygame.KEYUP and state == "Game":
                 if event.key == pygame.K_p:
                     if ship.autopilot:
                         ship.autopilot = False
                     else:
                         ship.autopilot = True
+                if event.key == pygame.K_ESCAPE:
+                    state = "Paused"
+            elif event.type == pygame.KEYUP and state == "Paused":
+                if event.key == pygame.K_ESCAPE:
+                    state = "Game"
                 
         #game info text rendering
         if showFPS:
@@ -136,6 +138,8 @@ def main(argv):
         elif (state == "Menu"):
             if start_button.pressed:
                 state = "Game"
+        elif (state == "Paused"):
+            pass
         
         '''
         Game state machine actions
@@ -152,9 +156,11 @@ def main(argv):
             #tick (THIS GOES LAST)
             map.tick(startloop)
             #ship.write_PID_alt_csv(pidfile)
-        
         elif (state == "Menu"):
             main_menu.tick(startloop)
+        elif (state == "Paused"):
+            pause_menu.tick(startloop)
+        
         
         tick += 1
 

@@ -14,6 +14,7 @@ import os
 import time
 import copy
 import csv
+import game_audio
 
 REFERENCE_PERIOD = 1.0/120.0
 
@@ -439,6 +440,8 @@ class Weapon(Entity):
         if (time.time() - self.last_fired >= self.cooldown):
             self.last_fired = time.time()
             
+            game_audio.play_sound('cannon')
+            
             L = -self.origin[0] + self.rect.width #get offset from mounting point
             
             self.world.add(Entity(self.space, load_image(self.projectile_filepath),
@@ -578,6 +581,9 @@ class Ship(Entity):
             if keys[pygame.K_a]: #throttle back
                 if self.power > -self.max_power:
                     self.power -= 1600 * (period / REFERENCE_PERIOD)
+                    
+                if not self.flipped:
+                   self.flip() 
                 '''
                 if (self.power > -self.max_power):
                     self.power -= 1600 * (period / REFERENCE_PERIOD)
@@ -585,6 +591,9 @@ class Ship(Entity):
             elif keys[pygame.K_d]: #throttle forward
                 if self.power < self.max_power:
                     self.power += 1600 * (period / REFERENCE_PERIOD)
+                    
+                if self.flipped:
+                   self.flip() 
                 '''
                 if (self.power < self.max_power):
                     self.power += 1600 * (period / REFERENCE_PERIOD)
@@ -701,12 +710,20 @@ class Ship(Entity):
         POS_INCREMENT = 10
     
         target = self.world.get_entity(target_ID)
-        if target:
+        if (self.NPC and target): #caveman pathfinding, just try to go to the player
             pathfinding_pos = target.body.position
+            self.PID_alt_setpoint = pathfinding_pos[1]
+            self.PID_pos_setpoint = pathfinding_pos[0]
+            
+            if (self.body.position[0] > target.body.position[0] and self.flipped == False):
+                self.flip()
+            elif (self.body.position[0] < target.body.position[0] and self.flipped == True):
+                self.flip()
         else:
             self.navigate = False #terminate pathfinding if target died
             return
         
+        '''
         if (self.NPC and target):
             intersections = self.num_intersections(pathfinding_pos, [self.ID, target_ID])
             
@@ -728,7 +745,9 @@ class Ship(Entity):
                 self.flip()
             elif (self.body.position[0] < target.body.position[0] and self.flipped == True):
                 self.flip()
-    
+        '''
+        
+        
     '''
     Update the position of the ship
     
@@ -829,6 +848,9 @@ class Ship(Entity):
     Handle collisions and deal damage
     '''
     def collision_handler(self, arbiter, space, data):
+        #impact.set_volume(0.5)
+        #impact.play()
+    
         mag_impulse = math.sqrt(arbiter.total_impulse[0] ** 2 + arbiter.total_impulse[1] ** 2)
         if mag_impulse > 10000: #filter out things like rubbing
             damage = (self.vulnerability * mag_impulse)/self.body.mass

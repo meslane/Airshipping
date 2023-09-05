@@ -5,6 +5,10 @@ The physics engine evaluates in 1/480 second intervals. This oversampling is don
 
 ~== TODO ==~
 -Refine pathfinding to do A* or something similar instead of the current crappy strategy
+-Add audio.py file to handle all game audio
+
+~== BUG TRACKER ==~
+-Killing weapon objects crashes the game
 
 ~== NOTES ==~
 -Pymunk does not like very large bodies, kinematic or not. You can get way better performance by simply spawning contiguous kinematic bodies as several individual tiles.

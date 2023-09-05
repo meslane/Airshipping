@@ -7,6 +7,7 @@ import json
 import random
 
 import entity
+import game_audio
 
 explosion_colors = [(251,146,43), (79,103,129), (175,191,210)]
 
@@ -126,6 +127,10 @@ class World:
         object = self.get_entity(ID)
         
         if isinstance(object, entity.Ship): #spawn frags
+            impulse_mag = 0.3e5 #impulse for explosion
+        
+            game_audio.play_sound('explosion')
+        
             for frag in object.frags:
                 if object.flipped:
                     new_position = [object.body.position[0] - frag['relative_position'][0], 
@@ -143,7 +148,6 @@ class World:
                     frag_object.flip()
                 
                 #explode
-                impulse_mag = 0.5e5
                 dir_mag = math.sqrt(frag['relative_position'][0] ** 2 + frag['relative_position'][1] ** 2)
                 impulse = [(frag['relative_position'][0]/dir_mag) * impulse_mag, 
                            (frag['relative_position'][1]/dir_mag) * impulse_mag]
@@ -153,14 +157,19 @@ class World:
                 
                 frag_object.body.apply_impulse_at_local_point(impulse)
                 
-                for i in range(50):
-                    p = entity.Particle(self.space, 1, explosion_colors[random.randint(0,2)], -200, 
-                    position = (object.body.position[0] + random.randint(-10,10),
-                                object.body.position[1] + random.randint(-10,10)), 
-                    lifespan = random.uniform(1,5), 
-                    velocity = (random.randint(-impulse_mag/200,impulse_mag/200), 
-                                random.randint(-impulse_mag/200,impulse_mag/200)))
-                    self.add(p)
+            for i in range(200):
+                p = entity.Particle(self.space, 1, explosion_colors[random.randint(0,2)], -200, 
+                position = (object.body.position[0] + random.randint(-10,10),
+                            object.body.position[1] + random.randint(-10,10)), 
+                lifespan = random.uniform(1,5), 
+                velocity = (random.randint(-impulse_mag/200,impulse_mag/200), 
+                            random.randint(-impulse_mag/200,impulse_mag/200)))
+                self.add(p)
+        
+            if object.cannon:
+                #self.kill_entity(object.cannon.ID)
+                self.space.remove(object.cannon_motor)
+                self.space.remove(object.joint)
         
         self.space.remove(object.body, object.box)
         self.entities.remove(object)

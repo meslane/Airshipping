@@ -16,32 +16,5 @@
 "pos_P": 20,
 "pos_I": 0,
 "pos_D": 0,
-"vulnerability": 0.5,
-"frags": [
-            {
-            "image": "Enemy_1_Frag_1.png",
-            "box": "Enemy_1_Frag_1.box",
-            "relative_position": [-20,-5]
-            },
-            {
-            "image": "Enemy_1_Frag_2.png",
-            "box": "Enemy_1_Frag_2.box",
-            "relative_position": [-8,4]
-            },
-            {
-            "image": "Enemy_1_Frag_3.png",
-            "box": "Enemy_1_Frag_3.box",
-            "relative_position": [16,4]
-            },
-            {
-            "image": "Enemy_1_Frag_4.png",
-            "box": "Enemy_1_Frag_4.box",
-            "relative_position": [0,-15]
-            },
-            {
-            "image": "Enemy_1_Frag_5.png",
-            "box": "Enemy_1_Frag_5.box",
-            "relative_position": [5,15]
-            }
-         ]
+"vulnerability": 1
 }
